@@ -5,33 +5,61 @@
 package com.avispl.symphony.dal.infrastructure.management.brightsign.bsncloud;
 
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.net.ConnectException;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.TimeZone;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.util.CollectionUtils;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import javax.security.auth.login.FailedLoginException;
 
 import com.avispl.symphony.api.dal.control.Controller;
-import com.avispl.symphony.api.dal.dto.control.AdvancedControllableProperty;
 import com.avispl.symphony.api.dal.dto.control.ControllableProperty;
 import com.avispl.symphony.api.dal.dto.monitor.ExtendedStatistics;
 import com.avispl.symphony.api.dal.dto.monitor.Statistics;
 import com.avispl.symphony.api.dal.dto.monitor.aggregator.AggregatedDevice;
+import com.avispl.symphony.api.dal.error.CommandFailureException;
+import com.avispl.symphony.api.dal.error.ResourceNotReachableException;
 import com.avispl.symphony.api.dal.monitor.Monitorable;
 import com.avispl.symphony.api.dal.monitor.aggregator.Aggregator;
+import com.avispl.symphony.dal.aggregator.parser.AggregatedDeviceProcessor;
+import com.avispl.symphony.dal.aggregator.parser.PropertiesMapping;
+import com.avispl.symphony.dal.aggregator.parser.PropertiesMappingParser;
 import com.avispl.symphony.dal.communicator.RestCommunicator;
+import com.avispl.symphony.dal.infrastructure.management.brightsign.bsncloud.common.AggregatedInformation;
+import com.avispl.symphony.dal.infrastructure.management.brightsign.bsncloud.common.AggregatorInformation;
+import com.avispl.symphony.dal.infrastructure.management.brightsign.bsncloud.common.BrightSignBSNCloudCommand;
+import com.avispl.symphony.dal.infrastructure.management.brightsign.bsncloud.common.BrightSignBSNCloudConstant;
+import com.avispl.symphony.dal.infrastructure.management.brightsign.bsncloud.common.LoginInfo;
+import com.avispl.symphony.dal.infrastructure.management.brightsign.bsncloud.common.PingMode;
+import com.avispl.symphony.dal.infrastructure.management.brightsign.bsncloud.common.metric.NetworkInformation;
+import com.avispl.symphony.dal.infrastructure.management.brightsign.bsncloud.common.metric.StorageInformation;
+import com.avispl.symphony.dal.util.StringUtils;
 
 
 public class BrightSignBSNCloudCommunicator extends RestCommunicator implements Aggregator, Monitorable, Controller {
@@ -73,7 +101,7 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 				}
 				long currentTimestamp = System.currentTimeMillis();
 				if (!flag && nextDevicesCollectionIterationTimestamp <= currentTimestamp) {
-					//populateDeviceDetails();
+					populateDeviceDetails();
 					flag = true;
 				}
 
@@ -131,6 +159,13 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 	private volatile long validRetrieveStatisticsTimestamp;
 
 	/**
+	 * Aggregator inactivity timeout. If the {@link BrightSignBSNCloudCommunicator#retrieveMultipleStatistics()}  method is not
+	 * called during this period of time - device is considered to be paused, thus the Cloud API
+	 * is not supposed to be called
+	 */
+	private static final long retrieveStatisticsTimeOut = 3 * 60 * 1000;
+
+	/**
 	 * Update the status of the device.
 	 * The device is considered as paused if did not receive any retrieveMultipleStatistics()
 	 * calls during {@link BrightSignBSNCloudCommunicator}
@@ -140,9 +175,34 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 	}
 
 	/**
+	 * Uptime time stamp to valid one
+	 */
+	private synchronized void updateValidRetrieveStatisticsTimestamp() {
+		validRetrieveStatisticsTimestamp = System.currentTimeMillis() + retrieveStatisticsTimeOut;
+		updateAggregatorStatus();
+	}
+
+	/**
+	 * A mapper for reading and writing JSON using Jackson library.
+	 * ObjectMapper provides functionality for converting between Java objects and JSON.
+	 * It can be used to serialize objects to JSON format, and deserialize JSON data to objects.
+	 */
+	ObjectMapper objectMapper = new ObjectMapper();
+
+	/**
 	 * Executor that runs all the async operations, that is posting and
 	 */
 	private ExecutorService executorService;
+
+	/**
+	 * the login info
+	 */
+	private LoginInfo loginInfo;
+
+	/**
+	 * the network name
+	 */
+	private String networkName;
 
 	/**
 	 * A private field that represents an instance of the BrightSignBSNCloudLoader class, which is responsible for loading device data for BrightSign BSNCloud
@@ -162,11 +222,51 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 	private ExtendedStatistics localExtendedStatistics;
 
 	/**
+	 * An instance of the AggregatedDeviceProcessor class used to process and aggregate device-related data.
+	 */
+	private AggregatedDeviceProcessor aggregatedDeviceProcessor;
+
+	/**
+	 * List of aggregated device
+	 */
+	private List<AggregatedDevice> aggregatedDeviceList = Collections.synchronizedList(new ArrayList<>());
+
+	/**
+	 * cache data for aggregated
+	 */
+	private List<AggregatedDevice> cachedData = Collections.synchronizedList(new ArrayList<>());
+
+	/**
+	 * ping mode
+	 */
+	private PingMode pingMode = PingMode.ICMP;
+
+	/**
+	 * Retrieves {@link #pingMode}
+	 *
+	 * @return value of {@link #pingMode}
+	 */
+	public String getPingMode() {
+		return pingMode.name();
+	}
+
+	/**
+	 * Sets {@link #pingMode} value
+	 *
+	 * @param pingMode new value of {@link #pingMode}
+	 */
+	public void setPingMode(String pingMode) {
+		this.pingMode = PingMode.ofString(pingMode);
+	}
+
+	/**
 	 * Constructs a new instance of BrightSignBSNCloudCommunicator.
 	 *
 	 * @throws IOException If an I/O error occurs while loading the properties mapping YAML file.
 	 */
 	public BrightSignBSNCloudCommunicator() throws IOException {
+		Map<String, PropertiesMapping> mapping = new PropertiesMappingParser().loadYML(BrightSignBSNCloudConstant.MODEL_MAPPING_AGGREGATED_DEVICE, getClass());
+		aggregatedDeviceProcessor = new AggregatedDeviceProcessor(mapping);
 		this.setTrustAllCertificates(true);
 	}
 
@@ -179,43 +279,49 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 	 */
 	@Override
 	public int ping() throws Exception {
-		if (isInitialized()) {
-			long pingResultTotal = 0L;
+		if (this.pingMode == PingMode.ICMP) {
+			return super.ping();
+		} else if (this.pingMode == PingMode.TCP) {
+			if (isInitialized()) {
+				long pingResultTotal = 0L;
 
-			for (int i = 0; i < this.getPingAttempts(); i++) {
-				long startTime = System.currentTimeMillis();
+				for (int i = 0; i < this.getPingAttempts(); i++) {
+					long startTime = System.currentTimeMillis();
 
-				try (Socket puSocketConnection = new Socket(this.host, this.getPort())) {
-					puSocketConnection.setSoTimeout(this.getPingTimeout());
-					if (puSocketConnection.isConnected()) {
-						long pingResult = System.currentTimeMillis() - startTime;
-						pingResultTotal += pingResult;
-						if (this.logger.isTraceEnabled()) {
-							this.logger.trace(String.format("PING OK: Attempt #%s to connect to %s on port %s succeeded in %s ms", i + 1, host, this.getPort(), pingResult));
+					try (Socket puSocketConnection = new Socket(this.host, this.getPort())) {
+						puSocketConnection.setSoTimeout(this.getPingTimeout());
+						if (puSocketConnection.isConnected()) {
+							long pingResult = System.currentTimeMillis() - startTime;
+							pingResultTotal += pingResult;
+							if (this.logger.isTraceEnabled()) {
+								this.logger.trace(String.format("PING OK: Attempt #%s to connect to %s on port %s succeeded in %s ms", i + 1, host, this.getPort(), pingResult));
+							}
+						} else {
+							if (this.logger.isDebugEnabled()) {
+								this.logger.debug(String.format("PING DISCONNECTED: Connection to %s did not succeed within the timeout period of %sms", host, this.getPingTimeout()));
+							}
+							return this.getPingTimeout();
 						}
-					} else {
-						if (this.logger.isDebugEnabled()) {
-							logger.debug(String.format("PING DISCONNECTED: Connection to %s did not succeed within the timeout period of %sms", host, this.getPingTimeout()));
+					} catch (SocketTimeoutException | ConnectException tex) {
+						throw new RuntimeException("Socket connection timed out", tex);
+					} catch (UnknownHostException ex) {
+						throw new UnknownHostException(String.format("Connection timed out, UNKNOWN host %s", host));
+					} catch (Exception e) {
+						if (this.logger.isWarnEnabled()) {
+							this.logger.warn(String.format("PING TIMEOUT: Connection to %s did not succeed, UNKNOWN ERROR %s: ", host, e.getMessage()));
 						}
 						return this.getPingTimeout();
 					}
-				} catch (SocketTimeoutException | ConnectException tex) {
-					throw new SocketTimeoutException("Socket connection timed out");
-				} catch (UnknownHostException tex) {
-					throw new SocketTimeoutException("Socket connection timed out" + tex.getMessage());
-				} catch (Exception e) {
-					if (this.logger.isWarnEnabled()) {
-						this.logger.warn(String.format("PING TIMEOUT: Connection to %s did not succeed, UNKNOWN ERROR %s: ", host, e.getMessage()));
-					}
-					return this.getPingTimeout();
 				}
+				return Math.max(1, Math.toIntExact(pingResultTotal / this.getPingAttempts()));
+			} else {
+				throw new IllegalStateException("Cannot use device class without calling init() first");
 			}
-			return Math.max(1, Math.toIntExact(pingResultTotal / this.getPingAttempts()));
 		} else {
-			throw new IllegalStateException("Cannot use device class without calling init() first");
+			throw new IllegalArgumentException("Unknown PING Mode: " + pingMode);
 		}
-
 	}
+
 
 	/**
 	 * {@inheritDoc}
@@ -224,11 +330,15 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 	public List<Statistics> getMultipleStatistics() throws Exception {
 		reentrantLock.lock();
 		try {
+			if (loginInfo == null) {
+				loginInfo = new LoginInfo();
+			}
+			checkAuthentication();
 			Map<String, String> statistics = new HashMap<>();
-			List<AdvancedControllableProperty> advancedControllableProperties = new ArrayList<>();
 			ExtendedStatistics extendedStatistics = new ExtendedStatistics();
+			populateNetworkInfo(statistics);
+			populateNumberOfDevice(statistics);
 			extendedStatistics.setStatistics(statistics);
-			extendedStatistics.setControllableProperties(advancedControllableProperties);
 			localExtendedStatistics = extendedStatistics;
 		} finally {
 			reentrantLock.unlock();
@@ -266,7 +376,16 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 	 */
 	@Override
 	public List<AggregatedDevice> retrieveMultipleStatistics() throws Exception {
-		return null;
+		if (executorService == null) {
+			executorService = Executors.newFixedThreadPool(1);
+			executorService.submit(deviceDataLoader = new BrightSignBSNCloudDataLoader());
+		}
+		nextDevicesCollectionIterationTimestamp = System.currentTimeMillis();
+		updateValidRetrieveStatisticsTimestamp();
+		if (cachedData.isEmpty()) {
+			return Collections.emptyList();
+		}
+		return cloneAndPopulateAggregatedDeviceList();
 	}
 
 	/**
@@ -275,6 +394,19 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 	@Override
 	public List<AggregatedDevice> retrieveMultipleStatistics(List<String> list) throws Exception {
 		return retrieveMultipleStatistics().stream().filter(aggregatedDevice -> list.contains(aggregatedDevice.getDeviceId())).collect(Collectors.toList());
+	}
+
+	/**
+	 * {@inheritDoc}
+	 * set API Key into Header of Request
+	 */
+	@Override
+	protected HttpHeaders putExtraRequestHeaders(HttpMethod httpMethod, String uri, HttpHeaders headers) {
+		if (loginInfo.getToken() != null && !uri.contains(BrightSignBSNCloudCommand.REST_TOKEN)) {
+			headers.setBearerAuth(loginInfo.getToken());
+		}
+		headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+		return headers;
 	}
 
 	/**
@@ -318,7 +450,453 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 			localExtendedStatistics.getStatistics().clear();
 			localExtendedStatistics.getControllableProperties().clear();
 		}
+		loginInfo = null;
 		nextDevicesCollectionIterationTimestamp = 0;
+		aggregatedDeviceList.clear();
+		cachedData.clear();
 		super.internalDestroy();
+	}
+
+	/**
+	 * Checks user authentication by verifying the login and password fields.
+	 * If the login or password fields are empty, or if the session has timed out, it attempts to retrieve a new token.
+	 *
+	 * @throws FailedLoginException if the username or password fields are empty or if their format is incorrect.
+	 * @throws Exception if the authentication process fails.
+	 */
+	private void checkAuthentication() throws Exception {
+		if (StringUtils.isNullOrEmpty(this.getLogin()) || StringUtils.isNullOrEmpty(this.getPassword())) {
+			throw new FailedLoginException("Username or Password field is empty. Please check device credentials");
+		}
+		if (this.loginInfo.isTimeout() || this.loginInfo.getToken() == null) {
+			String username;
+			String password;
+			String clientId;
+			String clientSecret;
+			String[] loginField = this.getLogin().split(BrightSignBSNCloudConstant.SPACE);
+			if (loginField.length == 2) {
+				username = loginField[0];
+				clientId = loginField[1];
+				String[] user = username.split("/");
+				if (user.length == 2) {
+					networkName = user[0];
+				}
+			} else {
+				throw new FailedLoginException("The format of Username field is incorrect. Please check again");
+			}
+
+			String[] passwordField = this.getPassword().split(BrightSignBSNCloudConstant.SPACE);
+			if (passwordField.length == 2) {
+				password = passwordField[0];
+				clientSecret = passwordField[1];
+			} else {
+				throw new FailedLoginException("The format of Password field is incorrect. Please check again");
+			}
+			retrieveToken(username, password, clientId, clientSecret);
+		}
+	}
+
+	/**
+	 * Retrieves an authorization token using the provided credentials.
+	 *
+	 * @param username the username for authentication
+	 * @param password the password for authentication
+	 * @param clientId the client ID for the application
+	 * @param clientSecret the client secret for the application
+	 * @throws FailedLoginException if login fails due to incorrect credentials
+	 * @throws ResourceNotReachableException if the endpoint is unreachable
+	 * @throws Exception for other unforeseen errors
+	 */
+	private void retrieveToken(String username, String password, String clientId, String clientSecret) throws Exception {
+		try {
+			MultiValueMap<String, String> request = new LinkedMultiValueMap<>();
+			request.add("client_id", clientId);
+			request.add("client_secret", clientSecret);
+			request.add("grant_type", "password");
+			request.add("username", username);
+			request.add("password", password);
+			JsonNode response = this.doPost(BrightSignBSNCloudCommand.REST_TOKEN, request, JsonNode.class);
+			if (response != null && response.has(BrightSignBSNCloudConstant.ACCESS_TOKEN)) {
+				this.loginInfo.setToken(response.get(BrightSignBSNCloudConstant.ACCESS_TOKEN).asText());
+				this.loginInfo.setLoginDateTime(System.currentTimeMillis());
+			} else {
+				loginInfo = null;
+				throw new ResourceNotReachableException("Unable to retrieve the authorization token, endpoint not reachable");
+			}
+		} catch (CommandFailureException e) {
+			if (e.getStatusCode() == 400) {
+				JsonNode response = objectMapper.readTree(e.getResponse());
+				if (response.has("error") && "invalid_grant".equalsIgnoreCase(response.get("error").asText())) {
+					throw new FailedLoginException("Unable to login. Please check device credentials");
+				}
+			}
+			throw new ResourceNotReachableException("Unable to retrieve the authorization token, endpoint not reachable", e);
+		} catch (Exception ex) {
+			throw new ResourceNotReachableException("Unable to retrieve the authorization token, endpoint not reachable", ex);
+		}
+	}
+
+	/**
+	 * Populates network information into the provided stats map by retrieving data from the network info endpoint.
+	 *
+	 * @param stats a map to store network information as key-value pairs
+	 * @throws ResourceNotReachableException if the network information cannot be retrieved
+	 */
+	private void populateNetworkInfo(Map<String, String> stats) {
+		try {
+			JsonNode response = this.doGet(BrightSignBSNCloudCommand.NETWORK_INFO, JsonNode.class);
+			for (JsonNode item : response) {
+				if (networkName.equals(item.get(BrightSignBSNCloudConstant.NAME).asText())) {
+					for (AggregatorInformation property : AggregatorInformation.values()) {
+						if (checkNode(property, item)) {
+							String group = property.getGroup();
+							switch (property) {
+								case CREATE_DATE:
+								case LAST_MODIFIED_DATE:
+								case LAST_LOCKOUT_DATE:
+								case LOCKOUT_DATE:
+									stats.put(uppercaseFirstCharacter(property.getName()),
+											convertDateTimeFormat(getDefaultValueForNullData(item.get(property.getName()).asText()), BrightSignBSNCloudConstant.DEFAULT_FORMAT_DATETIME_WITH_MILLIS));
+									break;
+								case SUB_LAST_MODIFIED_DATE:
+								case SUB_CREATE_DATE:
+									stats.put(uppercaseFirstCharacter(property.getGroup()) + "#" + uppercaseFirstCharacter(property.getName()),
+											convertDateTimeFormat(getDefaultValueForNullData(item.get(property.getGroup()).get(property.getName()).asText()),
+													BrightSignBSNCloudConstant.DEFAULT_FORMAT_DATETIME_WITH_MILLIS));
+									break;
+								case IS_LOCKED_OUT:
+									stats.put("LockedOut", getDefaultValueForNullData(item.get(property.getName()).asText()));
+									break;
+								default:
+									if (BrightSignBSNCloudConstant.EMPTY.equals(group)) {
+										stats.put(uppercaseFirstCharacter(property.getName()), getDefaultValueForNullData(item.get(property.getName()).asText()));
+									} else {
+										stats.put(uppercaseFirstCharacter(property.getGroup()) + "#" + uppercaseFirstCharacter(property.getName()),
+												getDefaultValueForNullData(item.get(property.getGroup()).get(property.getName()).asText()));
+									}
+									break;
+							}
+						}
+					}
+					break;
+				}
+			}
+		} catch (Exception e) {
+			throw new ResourceNotReachableException("Unable to retrieve network information.", e);
+		}
+	}
+
+	/**
+	 * Checks if the specified property exists in the given JSON node.
+	 *
+	 * @param property the property to check for existence
+	 * @param node the JSON node to check
+	 * @return true if the property exists in the node, false otherwise
+	 */
+	private boolean checkNode(AggregatorInformation property, JsonNode node) {
+		if (BrightSignBSNCloudConstant.EMPTY.equals(property.getGroup()) && node.has(property.getName())) {
+			return true;
+		}
+
+		if (!BrightSignBSNCloudConstant.EMPTY.equals(property.getGroup()) && node.has(property.getGroup()) && node.get(property.getGroup()).has(property.getName())) {
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	 * Populates number of device on network into the provided stats map by retrieving data from the COUNT endpoint.
+	 *
+	 * @param stats a map to store network information as key-value pairs
+	 * @throws ResourceNotReachableException if the network information cannot be retrieved
+	 */
+	private void populateNumberOfDevice(Map<String, String> stats) {
+		try {
+			String response = this.doGet(BrightSignBSNCloudCommand.GET_NUMBER_OF_DEVICES);
+			stats.put("NumberOfDevices", response);
+		} catch (CommandFailureException ex) {
+			if (!ex.getResponse().contains("Unsupported value")) {
+				throw new ResourceNotReachableException("Unable to retrieve get number of devices on network.", ex);
+			}
+			stats.put("NumberOfDevices", "0");
+		} catch (Exception e) {
+			throw new ResourceNotReachableException("Unable to retrieve get number of devices on network.", e);
+		}
+	}
+
+	/**
+	 * Populates device details by making a POST request to retrieve information from Dante Director.
+	 * The method clears the existing aggregated device list, processes the response, and updates the list accordingly.
+	 * Any error during the process is logged.
+	 */
+	private void populateDeviceDetails() {
+		try {
+			JsonNode response = this.doGet(BrightSignBSNCloudCommand.GET_ALL_DEVICES, JsonNode.class);
+			if (response != null && response.has(BrightSignBSNCloudConstant.ITEMS)) {
+				cachedData.clear();
+				for (JsonNode jsonNode : response.get(BrightSignBSNCloudConstant.ITEMS)) {
+					JsonNode node = objectMapper.createArrayNode().add(jsonNode);
+					String id = jsonNode.get("id").asText();
+					cachedData.removeIf(item -> item.getDeviceId().equals(id));
+					cachedData.addAll(aggregatedDeviceProcessor.extractDevices(node));
+				}
+			}
+		} catch (CommandFailureException ex) {
+			cachedData.clear();
+			logger.error(ex.getResponse(), ex);
+		} catch (Exception e) {
+			logger.error("Error while populate aggregated device", e);
+		}
+	}
+
+	/**
+	 * Clones and populates a new list of aggregated devices with mapped monitoring properties.
+	 *
+	 * @return A new list of {@link AggregatedDevice} objects with mapped monitoring properties.
+	 */
+	private List<AggregatedDevice> cloneAndPopulateAggregatedDeviceList() {
+		aggregatedDeviceList.clear();
+		synchronized (cachedData) {
+			for (AggregatedDevice item : cachedData) {
+				AggregatedDevice aggregatedDevice = new AggregatedDevice();
+				Map<String, String> cachedValue = item.getProperties();
+				aggregatedDevice.setDeviceId(item.getDeviceId());
+				aggregatedDevice.setDeviceModel(item.getDeviceModel());
+				aggregatedDevice.setDeviceName(item.getDeviceName());
+				aggregatedDevice.setDeviceOnline(item.getDeviceOnline());
+
+				Map<String, String> stats = new HashMap<>();
+				mapMonitoringProperty(cachedValue, stats);
+				aggregatedDevice.setProperties(stats);
+				aggregatedDeviceList.add(aggregatedDevice);
+			}
+		}
+		return aggregatedDeviceList;
+	}
+
+	/**
+	 * Maps monitoring properties from cached values to statistics and advanced control properties.
+	 *
+	 * @param cachedValue The cached values map containing raw monitoring data.
+	 * @param stats The statistics map to store mapped monitoring properties.
+	 */
+	private void mapMonitoringProperty(Map<String, String> cachedValue, Map<String, String> stats) {
+		for (AggregatedInformation property : AggregatedInformation.values()) {
+			String name = property.getName();
+			String propertyName = property.getGroup() + name;
+			String value = getDefaultValueForNullData(cachedValue.get(name));
+			switch (property) {
+				case SUBSCRIPTION:
+					break;
+				case LAST_CONNECTED:
+					stats.put(propertyName, convertDateTimeFormat(value, BrightSignBSNCloudConstant.DEFAULT_FORMAT_DATETIME_WITHOUT_MILLIS));
+					break;
+				case UPTIME:
+					stats.put(propertyName, formatUpTime(value));
+					break;
+				case NETWORK_INTERFACE:
+					populateNetworkInterface(value, stats);
+					break;
+				case STORAGE:
+					populateStorageInformation(value, stats);
+					break;
+				case DIAGNOSTIC_LOG:
+				case EVENT_LOG:
+				case PLAYBACK_LOG:
+				case STATE_LOG:
+				case VARIABLE_LOG:
+				case UPLOAD_AT_BOOT:
+					if (BrightSignBSNCloudConstant.TRUE.equalsIgnoreCase(value)) {
+						value = BrightSignBSNCloudConstant.ENABLED;
+					}
+					if (BrightSignBSNCloudConstant.FALSE.equalsIgnoreCase(value)) {
+						value = BrightSignBSNCloudConstant.DISABLED;
+					}
+					stats.put(propertyName, value);
+					break;
+				default:
+					stats.put(propertyName, value);
+			}
+		}
+	}
+
+	/**
+	 * Populates storage information into the provided stats map based on the JSON data string.
+	 *
+	 * @param value the JSON data string containing storage information
+	 * @param stats a map to store storage information as key-value pairs
+	 */
+	private void populateStorageInformation(String value, Map<String, String> stats) {
+		try {
+			JsonNode jsonNode = objectMapper.readTree(value);
+			int index = 0;
+			for (JsonNode node : jsonNode) {
+				index++;
+				String group = "Storage" + (jsonNode.size() == 1 ? BrightSignBSNCloudConstant.EMPTY : index) + "#";
+				for (StorageInformation item : StorageInformation.values()) {
+					switch (item) {
+						case SIZE_FREE:
+						case SIZE_TOTAL:
+							if (node.has(BrightSignBSNCloudConstant.STATS) && node.get(BrightSignBSNCloudConstant.STATS).has(item.getName())) {
+								stats.put(group + uppercaseFirstCharacter(item.getName()) + "(GB)",
+										convertBytesToGigabytes(getDefaultValueForNullData(node.get(BrightSignBSNCloudConstant.STATS).get(item.getName()).asText())));
+							}
+							break;
+						default:
+							if (node.has(item.getName())) {
+								stats.put(group + uppercaseFirstCharacter(item.getName()), getDefaultValueForNullData(node.get(item.getName()).asText()));
+							}
+							break;
+					}
+				}
+			}
+		} catch (Exception e) {
+			logger.error("Error while populate Storage Information", e);
+		}
+	}
+
+	/**
+	 * Populates network interface information into the provided stats map based on the JSON data string.
+	 *
+	 * @param value the JSON data string containing network interface information
+	 * @param stats a map to store network interface information as key-value pairs
+	 */
+	private void populateNetworkInterface(String value, Map<String, String> stats) {
+		try {
+			JsonNode jsonNode = objectMapper.readTree(value);
+			int index = 0;
+			for (JsonNode item : jsonNode) {
+				index++;
+				String group = "NetworkInterface" + (jsonNode.size() == 1 ? BrightSignBSNCloudConstant.EMPTY : index) + "#";
+				Iterator<Entry<String, JsonNode>> fields = item.fields();
+				while (fields.hasNext()) {
+					Map.Entry<String, JsonNode> field = fields.next();
+					String key = field.getKey();
+					JsonNode valueItem = field.getValue();
+
+					if (valueItem.isObject()) {
+						continue;
+					}
+					String valueNode;
+					if (valueItem.isArray()) {
+						valueNode = valueItem.toString().replace("[\"", BrightSignBSNCloudConstant.EMPTY).replace("\"]", BrightSignBSNCloudConstant.EMPTY);
+					} else if (valueItem.isNull()) {
+						valueNode = BrightSignBSNCloudConstant.NONE;
+					} else if (BrightSignBSNCloudConstant.TRUE.equalsIgnoreCase(valueItem.asText()) && !"enabled".equalsIgnoreCase(key)) {
+						valueNode = BrightSignBSNCloudConstant.ENABLED;
+					} else if (BrightSignBSNCloudConstant.FALSE.equalsIgnoreCase(valueItem.asText())) {
+						valueNode = BrightSignBSNCloudConstant.DISABLED;
+					} else {
+						valueNode = valueItem.asText();
+					}
+					if (!BrightSignBSNCloudConstant.NONE.equalsIgnoreCase(NetworkInformation.getByDefaultName(key))) {
+						stats.put(group + NetworkInformation.getByDefaultName(key), getDefaultValueForNullData(valueNode));
+					}
+				}
+			}
+		} catch (Exception e) {
+			logger.error("Error while populate Network Interfaces", e);
+		}
+	}
+
+	/**
+	 * capitalize the first character of the string
+	 *
+	 * @param input input string
+	 * @return string after fix
+	 */
+	private String uppercaseFirstCharacter(String input) {
+		char firstChar = input.charAt(0);
+		return Character.toUpperCase(firstChar) + input.substring(1);
+	}
+
+	/**
+	 * Converts a date-time string from the default format to the target format with GMT timezone.
+	 *
+	 * @param inputDateTime The input date-time string in the default format.
+	 * @return The date-time string after conversion to the target format with GMT timezone.
+	 * Returns {@link BrightSignBSNCloudConstant#NONE} if there is an error during conversion.
+	 * @throws Exception If there is an error parsing the input date-time string.
+	 */
+	private String convertDateTimeFormat(String inputDateTime, String format) {
+		if (BrightSignBSNCloudConstant.NONE.equals(inputDateTime)) {
+			return inputDateTime;
+		}
+		try {
+			SimpleDateFormat inputFormat = new SimpleDateFormat(format);
+			inputFormat.setTimeZone(TimeZone.getTimeZone("GMT"));
+
+			SimpleDateFormat outputFormat = new SimpleDateFormat(BrightSignBSNCloudConstant.TARGET_FORMAT_DATETIME);
+			outputFormat.setTimeZone(TimeZone.getTimeZone("GMT"));
+
+			Date date = inputFormat.parse(inputDateTime);
+			return outputFormat.format(date);
+		} catch (Exception e) {
+			logger.warn("Can't convert the date time value");
+			return BrightSignBSNCloudConstant.NONE;
+		}
+	}
+
+	/**
+	 * Formats uptime from a string representation "hh:mm:ss" into "X hour(s) Y minute(s)" format.
+	 *
+	 * @param time the uptime string to format
+	 * @return formatted uptime string or "None" if input is invalid
+	 */
+	private String formatUpTime(String time) {
+		if (BrightSignBSNCloudConstant.NONE.equalsIgnoreCase(time)) {
+			return time;
+		}
+		String[] timeParts = time.split(":");
+		if (timeParts.length != 3) {
+			return BrightSignBSNCloudConstant.NONE;
+		}
+		int hours = Integer.parseInt(timeParts[0]);
+		int minutes = Integer.parseInt(timeParts[1]);
+		return (hours == 0 ? BrightSignBSNCloudConstant.EMPTY : (hours + " hour(s) ")) + minutes + " minute(s)";
+	}
+
+	/**
+	 * Converts a byte value to gigabytes.
+	 *
+	 * @param value the byte value to convert
+	 * @return the value converted to gigabytes, rounded to two decimal places, or "None" if conversion fails
+	 */
+	private String convertBytesToGigabytes(String value) {
+		try {
+			long bytes = Long.parseLong(value);
+			return round((double) bytes / (1024 * 1024 * 1024), 2);
+		} catch (Exception e) {
+			logger.warn("Can't convert the value");
+			return BrightSignBSNCloudConstant.NONE;
+		}
+	}
+
+	/**
+	 * Rounds a double value to the specified number of decimal places.
+	 *
+	 * @param value the value to round
+	 * @param places the number of decimal places to round to
+	 * @return the rounded value as a string
+	 * @throws IllegalArgumentException if places is negative
+	 */
+	private String round(double value, int places) {
+		if (places < 0) {
+			throw new IllegalArgumentException();
+		}
+
+		BigDecimal bd = new BigDecimal(Double.toString(value));
+		bd = bd.setScale(places, RoundingMode.HALF_UP);
+		return String.valueOf(bd.doubleValue());
+	}
+
+	/**
+	 * check value is null or empty
+	 *
+	 * @param value input value
+	 * @return value after checking
+	 */
+	private String getDefaultValueForNullData(String value) {
+		return StringUtils.isNotNullOrEmpty(value) && !"null".equalsIgnoreCase(value) ? uppercaseFirstCharacter(value) : BrightSignBSNCloudConstant.NONE;
 	}
 }

@@ -1,0 +1,52 @@
+models:
+  - model:
+      name: Generic
+      vendor: BrightSignBSNCloud
+      filter: true
+      mapping:
+        deviceId: get("id")
+        deviceName: get("settings")?.get("name")
+        deviceModel: get("model")
+        deviceOnline: get("status")?.get("health").asText().equalsIgnoreCase("Normal")
+      properties:
+        PlayerID: get("serial")
+        Description: get("settings")?.get("description")
+        SetupType: get("settings")?.get("setupType")
+        Timezone: get("settings")?.get("timezone")
+        Hostname: get("settings")?.get("network")?.get("hostname")
+        FirmwareVersion: get("status")?.get("firmware")?.get("version")
+        DeviceUptime: get("status")?.get("uptime")
+        DeviceStatus: get("status")?.get("health")
+        LastConnected: get("status")?.get("lastModifiedDate")
+        ExternalIPAddress: get("status")?.get("network")?.get("externalIp")
+
+        GroupID: get("status")?.get("group")?.get("id")
+        GroupName: get("status")?.get("group")?.get("name")
+
+        NetworkInterface: get("settings")?.get("network")?.get("interfaces")
+
+        Latitude: get("settings")?.get("location")?.get("gpsLatitude")
+        Longitude: get("settings")?.get("location")?.get("gpsLongitude")
+        Country: get("settings")?.get("location")?.get("country")
+        Locality: get("settings")?.get("location")?.get("locality")
+
+
+        DiagnosticLog: get("settings")?.get("logging")?.get("enableDiagnosticLog")
+        EventLog: get("settings")?.get("logging")?.get("enableEventLog")
+        PlaybackLog: get("settings")?.get("logging")?.get("enablePlaybackLog")
+        StateLog: get("settings")?.get("logging")?.get("enableStateLog")
+        VariableLog: get("settings")?.get("logging")?.get("enableVariableLog")
+        UploadAtBoot: get("settings")?.get("logging")?.get("uploadAtBoot")
+        UploadTime: get("settings")?.get("logging")?.get("uploadTime")
+
+        Storage: get("status")?.get("storage")
+
+        Logging: get("subscription")
+        Type: get("subscription")?.get("type")
+        ActivityPeriod: get("subscription")?.get("activityPeriod")
+        Status: get("subscription")?.get("status")
+        CreationDate: get("subscription")?.get("creationDate")
+        LastModifiedDate: get("subscription")?.get("lastModifiedDate")
+        ActivationDate: get("subscription")?.get("activationDate")
+        SuspensionDate: get("subscription")?.get("suspensionDate")
+        ExpirationDate: get("subscription")?.get("expirationDate")
