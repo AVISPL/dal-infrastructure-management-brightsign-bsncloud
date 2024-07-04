@@ -13,6 +13,7 @@ import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
@@ -36,6 +37,7 @@ import org.springframework.util.MultiValueMap;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import javax.security.auth.login.FailedLoginException;
 
 import com.avispl.symphony.api.dal.control.Controller;
@@ -58,6 +60,7 @@ import com.avispl.symphony.dal.infrastructure.management.brightsign.bsncloud.com
 import com.avispl.symphony.dal.infrastructure.management.brightsign.bsncloud.common.LoginInfo;
 import com.avispl.symphony.dal.infrastructure.management.brightsign.bsncloud.common.PingMode;
 import com.avispl.symphony.dal.infrastructure.management.brightsign.bsncloud.common.metric.NetworkInformation;
+import com.avispl.symphony.dal.infrastructure.management.brightsign.bsncloud.common.metric.StatusEnum;
 import com.avispl.symphony.dal.infrastructure.management.brightsign.bsncloud.common.metric.StorageInformation;
 import com.avispl.symphony.dal.util.StringUtils;
 
@@ -240,6 +243,75 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 	 * ping mode
 	 */
 	private PingMode pingMode = PingMode.ICMP;
+
+	/**
+	 * filter by group ID
+	 */
+	private String filterByGroupID;
+
+	/**
+	 * filter by group name
+	 */
+	private String filterByGroupName;
+
+	/**
+	 * filter by model
+	 */
+	private String filterByModel;
+
+	/**
+	 * Retrieves {@link #filterByGroupID}
+	 *
+	 * @return value of {@link #filterByGroupID}
+	 */
+	public String getFilterByGroupID() {
+		return filterByGroupID;
+	}
+
+	/**
+	 * Sets {@link #filterByGroupID} value
+	 *
+	 * @param filterByStatus new value of {@link #filterByGroupID}
+	 */
+	public void setFilterByGroupID(String filterByStatus) {
+		this.filterByGroupID = filterByStatus;
+	}
+
+	/**
+	 * Retrieves {@link #filterByGroupName}
+	 *
+	 * @return value of {@link #filterByGroupName}
+	 */
+	public String getFilterByGroupName() {
+		return filterByGroupName;
+	}
+
+	/**
+	 * Sets {@link #filterByGroupName} value
+	 *
+	 * @param filterByGroupName new value of {@link #filterByGroupName}
+	 */
+	public void setFilterByGroupName(String filterByGroupName) {
+		this.filterByGroupName = filterByGroupName;
+	}
+
+	/**
+	 * Retrieves {@link #filterByModel}
+	 *
+	 * @return value of {@link #filterByModel}
+	 */
+	public String getFilterByModel() {
+		return filterByModel;
+	}
+
+	/**
+	 * Sets {@link #filterByModel} value
+	 *
+	 * @param filterByModel new value of {@link #filterByModel}
+	 */
+	public void setFilterByModel(String filterByModel) {
+		this.filterByModel = filterByModel;
+	}
 
 	/**
 	 * Retrieves {@link #pingMode}
@@ -612,7 +684,7 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 	 */
 	private void populateNumberOfDevice(Map<String, String> stats) {
 		try {
-			String response = this.doGet(BrightSignBSNCloudCommand.GET_NUMBER_OF_DEVICES);
+			String response = this.doGet(BrightSignBSNCloudCommand.GET_NUMBER_OF_DEVICES + createParamFilter());
 			stats.put("NumberOfDevices", response);
 		} catch (CommandFailureException ex) {
 			if (!ex.getResponse().contains("Unsupported value")) {
@@ -625,13 +697,64 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 	}
 
 	/**
+	 * Creates a parameter filter string for querying based on provided status, model, and group name filters.
+	 * The filters are concatenated with "AND" if more than one is present.
+	 *
+	 * @return a filter string in the format "?filter=[Status].[Health] IS IN ('value1', 'value2') AND [Model] IS IN ('value1', 'value2')..."
+	 */
+	private String createParamFilter() {
+		StringBuilder param = new StringBuilder("?filter=");
+		boolean isFirstFilterAdded = false;
+
+		if (StringUtils.isNotNullOrEmpty(filterByGroupID)) {
+			param.append("[Status].[Group].[ID] IS IN (")
+					.append(filterByGroupID)
+					.append(")");
+			isFirstFilterAdded = true;
+		}
+
+		if (StringUtils.isNotNullOrEmpty(filterByModel)) {
+			if (isFirstFilterAdded) {
+				param.append(" AND ");
+			}
+			param.append("[Model] IS IN (")
+					.append(convertToQuotedCSV(filterByModel))
+					.append(")");
+			isFirstFilterAdded = true;
+		}
+
+		if (StringUtils.isNotNullOrEmpty(filterByGroupName)) {
+			if (isFirstFilterAdded) {
+				param.append(" AND ");
+			}
+			param.append("[Status].[Group].[Name] IS IN (")
+					.append(convertToQuotedCSV(filterByGroupName))
+					.append(")");
+		}
+		return param.toString();
+	}
+
+	/**
+	 * Converts a comma-separated string into a quoted comma-separated string.
+	 * For example, "A,B,C" becomes "'A','B','C'".
+	 *
+	 * @param input the input string to convert.
+	 * @return a string where each element is surrounded by single quotes and separated by commas.
+	 */
+	private String convertToQuotedCSV(String input) {
+		String[] items = input.split(",");
+		return Arrays.stream(items).map(String::trim)
+				.map(item -> "'" + item + "'").collect(Collectors.joining(","));
+	}
+
+	/**
 	 * Populates device details by making a POST request to retrieve information from Dante Director.
 	 * The method clears the existing aggregated device list, processes the response, and updates the list accordingly.
 	 * Any error during the process is logged.
 	 */
 	private void populateDeviceDetails() {
 		try {
-			JsonNode response = this.doGet(BrightSignBSNCloudCommand.GET_ALL_DEVICES, JsonNode.class);
+			JsonNode response = this.doGet(BrightSignBSNCloudCommand.GET_ALL_DEVICES + createParamFilter(), JsonNode.class);
 			if (response != null && response.has(BrightSignBSNCloudConstant.ITEMS)) {
 				cachedData.clear();
 				for (JsonNode jsonNode : response.get(BrightSignBSNCloudConstant.ITEMS)) {
@@ -686,7 +809,8 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 			String propertyName = property.getGroup() + name;
 			String value = getDefaultValueForNullData(cachedValue.get(name));
 			switch (property) {
-				case SUBSCRIPTION:
+				case DEVICE_STATUS:
+					stats.put(propertyName, StatusEnum.getNameByValue(value));
 					break;
 				case LAST_CONNECTED:
 					stats.put(propertyName, convertDateTimeFormat(value, BrightSignBSNCloudConstant.DEFAULT_FORMAT_DATETIME_WITHOUT_MILLIS));
@@ -729,10 +853,18 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 	private void populateStorageInformation(String value, Map<String, String> stats) {
 		try {
 			JsonNode jsonNode = objectMapper.readTree(value);
+			ArrayNode filteredNodes = objectMapper.createArrayNode();
+			jsonNode.forEach(node -> {
+				if (!(node.has("interface") &&
+						("Tmp".equalsIgnoreCase(node.get("interface").asText()) ||
+								"Flash".equalsIgnoreCase(node.get("interface").asText())))) {
+					filteredNodes.add(node);
+				}
+			});
 			int index = 0;
-			for (JsonNode node : jsonNode) {
+			for (JsonNode node : filteredNodes) {
 				index++;
-				String group = "Storage" + (jsonNode.size() == 1 ? BrightSignBSNCloudConstant.EMPTY : index) + "#";
+				String group = "Storage" + (filteredNodes.size() == 1 ? BrightSignBSNCloudConstant.EMPTY : index) + "#";
 				for (StorageInformation item : StorageInformation.values()) {
 					switch (item) {
 						case SIZE_FREE:
@@ -851,9 +983,26 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 		if (timeParts.length != 3) {
 			return BrightSignBSNCloudConstant.NONE;
 		}
-		int hours = Integer.parseInt(timeParts[0]);
+		int hours;
+		int days = 0;
+		if (timeParts[0].contains(".")) {
+			String[] dayTimeParts = timeParts[0].split("\\.");
+			if (dayTimeParts.length != 2) {
+				return BrightSignBSNCloudConstant.NONE;
+			}
+			days = Integer.parseInt(dayTimeParts[0]);
+			hours = Integer.parseInt(dayTimeParts[1]);
+		} else {
+			hours = Integer.parseInt(timeParts[0]);
+		}
 		int minutes = Integer.parseInt(timeParts[1]);
-		return (hours == 0 ? BrightSignBSNCloudConstant.EMPTY : (hours + " hour(s) ")) + minutes + " minute(s)";
+		if (days != 0) {
+			return days + " day(s) " + hours + " hour(s) " + minutes + " minute(s) ";
+		} else if (hours != 0) {
+			return hours + " hour(s) " + minutes + " minute(s) ";
+		} else {
+			return minutes + " minute(s) ";
+		}
 	}
 
 	/**

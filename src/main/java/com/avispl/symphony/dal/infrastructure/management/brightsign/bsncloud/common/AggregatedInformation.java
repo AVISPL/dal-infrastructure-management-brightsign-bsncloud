@@ -14,9 +14,9 @@ package com.avispl.symphony.dal.infrastructure.management.brightsign.bsncloud.co
 public enum AggregatedInformation {
 	PLAYER_ID("PlayerID", ""),
 	DESCRIPTION("Description", ""),
+	PRESENTATION("Presentation", ""),
 	SETUP_TYPE("SetupType", ""),
 	TIME_ZONE("Timezone", ""),
-	HOST_NAME("Hostname", ""),
 	FIRMWARE_VERSION("FirmwareVersion", ""),
 	UPTIME("DeviceUptime", ""),
 	DEVICE_STATUS("DeviceStatus", ""),
@@ -41,10 +41,6 @@ public enum AggregatedInformation {
 	VARIABLE_LOG("VariableLog", "Logging#"),
 	UPLOAD_AT_BOOT("UploadAtBoot", "Logging#"),
 	UPLOAD_TIME("UploadTime", "Logging#"),
-
-	SUBSCRIPTION("Subscription", ""),
-	TYPE("Type", "Subscription#"),
-	STATUS("Status", "Subscription#"),
 	;
 	private final String name;
 	private final String group;

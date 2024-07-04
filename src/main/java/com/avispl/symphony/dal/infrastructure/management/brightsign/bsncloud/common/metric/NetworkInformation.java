@@ -17,7 +17,7 @@ import com.avispl.symphony.dal.infrastructure.management.brightsign.bsncloud.com
  * @since 1.0.0
  */
 public enum NetworkInformation {
-	IP("IP", "ip"),
+	IP("IPAddress", "ip"),
 	ENABLED("Enabled", "enabled"),
 	DNS("DNS", "dns"),
 	GATEWAY("Gateway", "gateway"),

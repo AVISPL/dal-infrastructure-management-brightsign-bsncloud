@@ -11,9 +11,9 @@ models:
       properties:
         PlayerID: get("serial")
         Description: get("settings")?.get("description")
+        Presentation: get("status")?.get("presentation")?.get("name")
         SetupType: get("settings")?.get("setupType")
         Timezone: get("settings")?.get("timezone")
-        Hostname: get("settings")?.get("network")?.get("hostname")
         FirmwareVersion: get("status")?.get("firmware")?.get("version")
         DeviceUptime: get("status")?.get("uptime")
         DeviceStatus: get("status")?.get("health")
@@ -27,8 +27,8 @@ models:
 
         Latitude: get("settings")?.get("location")?.get("gpsLatitude")
         Longitude: get("settings")?.get("location")?.get("gpsLongitude")
-        Country: get("settings")?.get("location")?.get("country")
-        Locality: get("settings")?.get("location")?.get("locality")
+        Country: get("settings")?.get("location")?.get("countryLongName")
+        Locality: get("settings")?.get("location")?.get("localityLongName")
 
 
         DiagnosticLog: get("settings")?.get("logging")?.get("enableDiagnosticLog")
@@ -40,13 +40,3 @@ models:
         UploadTime: get("settings")?.get("logging")?.get("uploadTime")
 
         Storage: get("status")?.get("storage")
-
-        Logging: get("subscription")
-        Type: get("subscription")?.get("type")
-        ActivityPeriod: get("subscription")?.get("activityPeriod")
-        Status: get("subscription")?.get("status")
-        CreationDate: get("subscription")?.get("creationDate")
-        LastModifiedDate: get("subscription")?.get("lastModifiedDate")
-        ActivationDate: get("subscription")?.get("activationDate")
-        SuspensionDate: get("subscription")?.get("suspensionDate")
-        ExpirationDate: get("subscription")?.get("expirationDate")
