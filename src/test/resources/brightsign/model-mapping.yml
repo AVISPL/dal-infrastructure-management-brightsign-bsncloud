@@ -14,7 +14,7 @@ models:
         Presentation: get("status")?.get("presentation")?.get("name")
         SetupType: get("settings")?.get("setupType")
         Timezone: get("settings")?.get("timezone")
-        FirmwareVersion: get("status")?.get("firmware")?.get("version")
+        BrightSignOSVersion: get("status")?.get("firmware")?.get("version")
         DeviceUptime: get("status")?.get("uptime")
         DeviceStatus: get("status")?.get("health")
         LastConnected: get("status")?.get("lastModifiedDate")

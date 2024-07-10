@@ -21,6 +21,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Optional;
 import java.util.TimeZone;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -38,9 +39,11 @@ import org.springframework.util.MultiValueMap;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import javax.security.auth.login.FailedLoginException;
 
 import com.avispl.symphony.api.dal.control.Controller;
+import com.avispl.symphony.api.dal.dto.control.AdvancedControllableProperty;
 import com.avispl.symphony.api.dal.dto.control.ControllableProperty;
 import com.avispl.symphony.api.dal.dto.monitor.ExtendedStatistics;
 import com.avispl.symphony.api.dal.dto.monitor.Statistics;
@@ -245,6 +248,16 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 	private PingMode pingMode = PingMode.ICMP;
 
 	/**
+	 * number of devices
+	 */
+	private int numberOfDevices;
+
+	/**
+	 * Next Marker
+	 */
+	private String nextMarker;
+
+	/**
 	 * filter by group ID
 	 */
 	private String filterByGroupID;
@@ -423,7 +436,55 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 	 */
 	@Override
 	public void controlProperty(ControllableProperty controllableProperty) throws Exception {
+		reentrantLock.lock();
+		try {
+			String property = controllableProperty.getProperty();
+			String deviceId = controllableProperty.getDeviceId();
 
+			String[] propertyList = property.split(BrightSignBSNCloudConstant.HASH);
+			String propertyName = property;
+			if (property.contains(BrightSignBSNCloudConstant.HASH)) {
+				propertyName = propertyList[1];
+			}
+			Optional<AggregatedDevice> aggregatedDevice = aggregatedDeviceList.stream().filter(item -> item.getDeviceId().equals(deviceId)).findFirst();
+			if (aggregatedDevice.isPresent()) {
+				String deviceSerial = aggregatedDevice.get().getProperties().get(AggregatedInformation.PLAYER_ID.getName());
+				if (StringUtils.isNullOrEmpty(deviceSerial)) {
+					throw new IllegalArgumentException(String.format("Unable to control property: %s as the device serial not found.", property));
+				}
+				switch (propertyName) {
+					case BrightSignBSNCloudConstant.REBOOT_PLAYER:
+						String request = String.format(BrightSignBSNCloudCommand.REBOOT_ENDPOINT, deviceSerial);
+						JsonNode response = doPut(request, new HashMap<>(), JsonNode.class);
+
+						if (checkFailedResponse(response)) {
+							throw new IllegalArgumentException(String.format("Unable to control property: %s", property));
+						}
+						break;
+					case BrightSignBSNCloudConstant.REBOOT_WITH_CRASH_REPORT:
+						request = String.format(BrightSignBSNCloudCommand.REBOOT_ENDPOINT, deviceSerial);
+						ObjectNode rootNode = objectMapper.createObjectNode();
+						ObjectNode dataNode = objectMapper.createObjectNode();
+						dataNode.put("crash_report", true);
+						rootNode.set("data", dataNode);
+
+						response = doPut(request, rootNode, JsonNode.class);
+						if (checkFailedResponse(response)) {
+							throw new IllegalArgumentException(String.format("Unable to control property: %s", property));
+						}
+						break;
+					default:
+						if (logger.isWarnEnabled()) {
+							logger.warn(String.format("Unable to execute %s command on device %s: Not Supported", property, deviceId));
+						}
+						break;
+				}
+			} else {
+				throw new IllegalArgumentException(String.format("Unable to control property: %s as the device does not exist.", property));
+			}
+		} finally {
+			reentrantLock.unlock();
+		}
 	}
 
 	/**
@@ -478,6 +539,9 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 			headers.setBearerAuth(loginInfo.getToken());
 		}
 		headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+		if (uri.contains("v1/control/reboot")) {
+			headers.setContentType(MediaType.APPLICATION_JSON);
+		}
 		return headers;
 	}
 
@@ -686,6 +750,7 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 		try {
 			String response = this.doGet(BrightSignBSNCloudCommand.GET_NUMBER_OF_DEVICES + createParamFilter());
 			stats.put("NumberOfDevices", response);
+			numberOfDevices = Integer.parseInt(response);
 		} catch (CommandFailureException ex) {
 			if (!ex.getResponse().contains("Unsupported value")) {
 				throw new ResourceNotReachableException("Unable to retrieve get number of devices on network.", ex);
@@ -748,20 +813,23 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 	}
 
 	/**
-	 * Populates device details by making a POST request to retrieve information from Dante Director.
+	 * Populates device details by making a POST request to retrieve information from Bright Sign.
 	 * The method clears the existing aggregated device list, processes the response, and updates the list accordingly.
 	 * Any error during the process is logged.
 	 */
 	private void populateDeviceDetails() {
 		try {
-			JsonNode response = this.doGet(BrightSignBSNCloudCommand.GET_ALL_DEVICES + createParamFilter(), JsonNode.class);
+			JsonNode response = this.doGet(BrightSignBSNCloudCommand.GET_ALL_DEVICES + createParamFilter() + createPageSizeParam(), JsonNode.class);
 			if (response != null && response.has(BrightSignBSNCloudConstant.ITEMS)) {
-				cachedData.clear();
 				for (JsonNode jsonNode : response.get(BrightSignBSNCloudConstant.ITEMS)) {
 					JsonNode node = objectMapper.createArrayNode().add(jsonNode);
 					String id = jsonNode.get("id").asText();
 					cachedData.removeIf(item -> item.getDeviceId().equals(id));
 					cachedData.addAll(aggregatedDeviceProcessor.extractDevices(node));
+				}
+				nextMarker = BrightSignBSNCloudConstant.EMPTY;
+				if (response.has("isTruncated") && BrightSignBSNCloudConstant.TRUE.equalsIgnoreCase(response.get("isTruncated").asText())) {
+					nextMarker = response.get("nextMarker").asText();
 				}
 			}
 		} catch (CommandFailureException ex) {
@@ -770,6 +838,19 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 		} catch (Exception e) {
 			logger.error("Error while populate aggregated device", e);
 		}
+	}
+
+	/**
+	 * Creates a query parameter string for pagination based on the number of devices and the next marker.
+	 *
+	 * @return A string representing the pagination parameters for a query.
+	 */
+	private String createPageSizeParam() {
+		String result = "&pageSize=" + numberOfDevices;
+		if (StringUtils.isNotNullOrEmpty(nextMarker)) {
+			result += "&nextMarker=" + nextMarker;
+		}
+		return result;
 	}
 
 	/**
@@ -789,12 +870,27 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 				aggregatedDevice.setDeviceOnline(item.getDeviceOnline());
 
 				Map<String, String> stats = new HashMap<>();
+				List<AdvancedControllableProperty> advancedControllableProperties = new ArrayList<>();
 				mapMonitoringProperty(cachedValue, stats);
+				mapControllableProperty(stats, advancedControllableProperties);
 				aggregatedDevice.setProperties(stats);
+				aggregatedDevice.setControllableProperties(advancedControllableProperties);
 				aggregatedDeviceList.add(aggregatedDevice);
 			}
 		}
 		return aggregatedDeviceList;
+	}
+
+	/**
+	 * Maps controllable properties to the provided stats and advancedControllableProperties lists.
+	 * This method adds buttons for "Reboot Player" and "Reboot with Crash Report" to the advanced controllable properties.
+	 *
+	 * @param stats A map containing the statistics to be populated with controllable properties.
+	 * @param advancedControllableProperties A list of AdvancedControllableProperty objects to be populated with controllable properties.
+	 */
+	private void mapControllableProperty(Map<String, String> stats, List<AdvancedControllableProperty> advancedControllableProperties) {
+		addAdvancedControlProperties(advancedControllableProperties, stats, createButton(BrightSignBSNCloudConstant.REBOOT_PLAYER, "Apply", "Applying", 0), BrightSignBSNCloudConstant.NONE);
+		addAdvancedControlProperties(advancedControllableProperties, stats, createButton(BrightSignBSNCloudConstant.REBOOT_WITH_CRASH_REPORT, "Apply", "Applying", 0), BrightSignBSNCloudConstant.NONE);
 	}
 
 	/**
@@ -855,9 +951,9 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 			JsonNode jsonNode = objectMapper.readTree(value);
 			ArrayNode filteredNodes = objectMapper.createArrayNode();
 			jsonNode.forEach(node -> {
-				if (!(node.has("interface") &&
-						("Tmp".equalsIgnoreCase(node.get("interface").asText()) ||
-								"Flash".equalsIgnoreCase(node.get("interface").asText())))) {
+				if (!(node.has(BrightSignBSNCloudConstant.INTERFACE) &&
+						("Tmp".equalsIgnoreCase(node.get(BrightSignBSNCloudConstant.INTERFACE).asText()) ||
+								"Flash".equalsIgnoreCase(node.get(BrightSignBSNCloudConstant.INTERFACE).asText())))) {
 					filteredNodes.add(node);
 				}
 			});
@@ -929,6 +1025,23 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 		} catch (Exception e) {
 			logger.error("Error while populate Network Interfaces", e);
 		}
+	}
+
+	/**
+	 * Checks if the given JSON response indicates a failed operation.
+	 *
+	 * @param response The JSON response to be checked.
+	 * @return {@code true} if the response is null, does not contain the required data,
+	 *         or the success flag is not set to "true"; {@code false} otherwise.
+	 */
+	private boolean checkFailedResponse(JsonNode response){
+		if (response == null || !response.has(BrightSignBSNCloudConstant.DATA) || !response.get(BrightSignBSNCloudConstant.DATA).has(BrightSignBSNCloudConstant.RESULT) ||
+				!response.get(BrightSignBSNCloudConstant.DATA).get(BrightSignBSNCloudConstant.RESULT).has(BrightSignBSNCloudConstant.SUCCESS)
+				|| !BrightSignBSNCloudConstant.TRUE.equalsIgnoreCase(
+				response.get(BrightSignBSNCloudConstant.DATA).get(BrightSignBSNCloudConstant.RESULT).get(BrightSignBSNCloudConstant.SUCCESS).asText())) {
+			return true;
+		}
+		return false;
 	}
 
 	/**
@@ -1047,5 +1160,41 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 	 */
 	private String getDefaultValueForNullData(String value) {
 		return StringUtils.isNotNullOrEmpty(value) && !"null".equalsIgnoreCase(value) ? uppercaseFirstCharacter(value) : BrightSignBSNCloudConstant.NONE;
+	}
+
+	/**
+	 * Create a button.
+	 *
+	 * @param name name of the button
+	 * @param label label of the button
+	 * @param labelPressed label of the button after pressing it
+	 * @param gracePeriod grace period of button
+	 * @return This returns the instance of {@link AdvancedControllableProperty} type Button.
+	 */
+	private AdvancedControllableProperty createButton(String name, String label, String labelPressed, long gracePeriod) {
+		AdvancedControllableProperty.Button button = new AdvancedControllableProperty.Button();
+		button.setLabel(label);
+		button.setLabelPressed(labelPressed);
+		button.setGracePeriod(gracePeriod);
+		return new AdvancedControllableProperty(name, new Date(), button, BrightSignBSNCloudConstant.EMPTY);
+	}
+
+	/**
+	 * Add addAdvancedControlProperties if advancedControllableProperties different empty
+	 *
+	 * @param advancedControllableProperties advancedControllableProperties is the list that store all controllable properties
+	 * @param stats store all statistics
+	 * @param property the property is item advancedControllableProperties
+	 * @throws IllegalStateException when exception occur
+	 */
+	private void addAdvancedControlProperties(List<AdvancedControllableProperty> advancedControllableProperties, Map<String, String> stats, AdvancedControllableProperty property, String value) {
+		if (property != null) {
+			advancedControllableProperties.removeIf(controllableProperty -> controllableProperty.getName().equals(property.getName()));
+
+			String propertyValue = StringUtils.isNotNullOrEmpty(value) ? value : BrightSignBSNCloudConstant.EMPTY;
+			stats.put(property.getName(), propertyValue);
+
+			advancedControllableProperties.add(property);
+		}
 	}
 }

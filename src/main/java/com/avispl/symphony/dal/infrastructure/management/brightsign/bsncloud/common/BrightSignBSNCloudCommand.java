@@ -16,4 +16,5 @@ public class BrightSignBSNCloudCommand {
 	public static final String GET_NUMBER_OF_DEVICES = "2022/06/REST/Devices/Count";
 	public static final String NETWORK_INFO = "2022/06/REST/Self/Networks";
 	public static final String GET_ALL_DEVICES = "2022/06/REST/Devices";
+	public static final String REBOOT_ENDPOINT = "https://ws.bsn.cloud/rest/v1/control/reboot/?destinationType=player&destinationName=%s";
 }

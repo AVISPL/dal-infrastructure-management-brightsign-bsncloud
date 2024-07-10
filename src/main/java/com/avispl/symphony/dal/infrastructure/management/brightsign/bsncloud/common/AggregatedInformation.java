@@ -17,7 +17,7 @@ public enum AggregatedInformation {
 	PRESENTATION("Presentation", ""),
 	SETUP_TYPE("SetupType", ""),
 	TIME_ZONE("Timezone", ""),
-	FIRMWARE_VERSION("FirmwareVersion", ""),
+	FIRMWARE_VERSION("BrightSignOSVersion", ""),
 	UPTIME("DeviceUptime", ""),
 	DEVICE_STATUS("DeviceStatus", ""),
 	LAST_CONNECTED("LastConnected", ""),

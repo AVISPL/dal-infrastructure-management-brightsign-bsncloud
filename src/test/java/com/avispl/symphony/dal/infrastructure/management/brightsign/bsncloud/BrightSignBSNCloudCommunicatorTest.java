@@ -14,8 +14,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import com.avispl.symphony.api.dal.dto.control.AdvancedControllableProperty;
+import com.avispl.symphony.api.dal.dto.control.ControllableProperty;
 import com.avispl.symphony.api.dal.dto.monitor.ExtendedStatistics;
 import com.avispl.symphony.api.dal.dto.monitor.aggregator.AggregatedDevice;
+import com.avispl.symphony.dal.infrastructure.management.brightsign.bsncloud.common.BrightSignBSNCloudConstant;
 
 /**
  * BrightSignBSNCloudCommunicatorTest
@@ -104,7 +106,7 @@ public class BrightSignBSNCloudCommunicatorTest {
 			Assert.assertEquals("373011", stats.get("GroupID"));
 			Assert.assertEquals("None", stats.get("Hostname"));
 			Assert.assertEquals("Symphony_Dev", stats.get("Presentation"));
-			Assert.assertEquals("9.0.145.1", stats.get("FirmwareVersion"));
+			Assert.assertEquals("9.0.145.1", stats.get("BrightSignOSVersion"));
 			Assert.assertEquals("Normal", stats.get("DeviceStatus"));
 		}
 	}
@@ -141,5 +143,38 @@ public class BrightSignBSNCloudCommunicatorTest {
 			Assert.assertEquals("United States", stats.get("Location#Country"));
 			Assert.assertEquals("Raleigh", stats.get("Location#Locality"));
 		}
+	}
+
+
+	@Test
+	void testRebootControl() throws Exception {
+		brightSignBSNCloudCommunicator.getMultipleStatistics();
+		brightSignBSNCloudCommunicator.retrieveMultipleStatistics();
+		Thread.sleep(20000);
+		brightSignBSNCloudCommunicator.retrieveMultipleStatistics();
+		ControllableProperty controllableProperty = new ControllableProperty();
+		String property = "Reboot Player";
+		String value = "1";
+		String deviceId = "1233489";
+		controllableProperty.setProperty(property);
+		controllableProperty.setValue(value);
+		controllableProperty.setDeviceId(deviceId);
+		brightSignBSNCloudCommunicator.controlProperty(controllableProperty);
+	}
+
+	@Test
+	void testRebootWithCrashReportControl() throws Exception {
+		brightSignBSNCloudCommunicator.getMultipleStatistics();
+		brightSignBSNCloudCommunicator.retrieveMultipleStatistics();
+		Thread.sleep(20000);
+		brightSignBSNCloudCommunicator.retrieveMultipleStatistics();
+		ControllableProperty controllableProperty = new ControllableProperty();
+		String property = BrightSignBSNCloudConstant.REBOOT_WITH_CRASH_REPORT;
+		String value = "1";
+		String deviceId = "1233489";
+		controllableProperty.setProperty(property);
+		controllableProperty.setValue(value);
+		controllableProperty.setDeviceId(deviceId);
+		brightSignBSNCloudCommunicator.controlProperty(controllableProperty);
 	}
 }
