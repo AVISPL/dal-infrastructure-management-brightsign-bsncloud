@@ -76,10 +76,19 @@ public class BrightSignBSNCloudCommunicatorTest {
 		Assert.assertEquals(1, advancedControllableProperties.size());
 	}
 
-	/**
-	 * Test case for getting the number of devices from Dante Director.
-	 * Verifies the number of devices retrieved.
-	 */
+
+	@Test
+	void testGetNumberOfDevicesWithFilter() throws Exception {
+		brightSignBSNCloudCommunicator.setFilterByModel("XD1035");
+		brightSignBSNCloudCommunicator.setFilterByGroupName("Default");
+		brightSignBSNCloudCommunicator.setFilterByGroupID("11");
+		brightSignBSNCloudCommunicator.getMultipleStatistics();
+		brightSignBSNCloudCommunicator.retrieveMultipleStatistics();
+		Thread.sleep(20000);
+		List<AggregatedDevice> aggregatedDeviceList = brightSignBSNCloudCommunicator.retrieveMultipleStatistics();
+		Assert.assertEquals(1, aggregatedDeviceList.size());
+	}
+
 	@Test
 	void testGetNumberOfDevices() throws Exception {
 		brightSignBSNCloudCommunicator.getMultipleStatistics();
