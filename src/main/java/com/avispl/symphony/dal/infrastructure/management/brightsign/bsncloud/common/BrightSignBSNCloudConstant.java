@@ -29,8 +29,8 @@ public class BrightSignBSNCloudConstant {
 	public static final String INTERFACE = "interface";
 	public static final String ENABLED = "Enabled";
 	public static final String DISABLED = "Disabled";
-	public static final String REBOOT_PLAYER = "Reboot Player";
-	public static final String REBOOT_WITH_CRASH_REPORT = "Reboot With Crash Report";
+	public static final String REBOOT_PLAYER = "RebootPlayer";
+	public static final String REBOOT_WITH_CRASH_REPORT = "RebootWithCrashReport";
 	public static final String DEFAULT_FORMAT_DATETIME_WITH_MILLIS  = "yyyy-MM-dd'T'HH:mm:ss.S'Z'";
 	public static final String DEFAULT_FORMAT_DATETIME_WITHOUT_MILLIS  = "yyyy-MM-dd'T'HH:mm:ss'Z'";
 	public static final String TARGET_FORMAT_DATETIME = "MMM d, yyyy, h:mm a";
