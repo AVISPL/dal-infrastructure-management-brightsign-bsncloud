@@ -68,6 +68,101 @@ import com.avispl.symphony.dal.infrastructure.management.brightsign.bsncloud.com
 import com.avispl.symphony.dal.util.StringUtils;
 
 
+/**
+ * BrightSignBSNCloudCommunicator
+ * Supported features are:
+ * Monitoring Aggregator Device:
+ *  <ul>
+ *  <li> - CreationDate</li>
+ *  <li> - LastLockoutDate</li>
+ *  <li> - LastModifiedDate</li>
+ *  <li> - LockedOut</li>
+ *  <li> - LockoutDate</li>
+ *  <li> - Name</li>
+ *  <li> - NumberOfDevices</li>
+ *  <ul>
+ *
+ * Subscription Group:
+ * <ul>
+ * <li> - CreationDate</li>
+ * <li> - ExpireDate</li>
+ * <li> - LastModifiedDate</li>
+ * <li> - Level</li>
+ * </ul>
+ *
+ * General Info Aggregated Device:
+ * <ul>
+ * <li> - BrightSignOSVersion</li>
+ * <li> - Description</li>
+ * <li> - deviceId</li>
+ * <li> - deviceModel</li>
+ * <li> - deviceName</li>
+ * <li> - deviceOnline</li>
+ * <li> - DeviceStatus</li>
+ * <li> - DeviceUptime</li>
+ * <li> - ExternalIPAddress</li>
+ * <li> - GroupID</li>
+ * <li> - GroupName</li>
+ * <li> - LastConnected</li>
+ * <li> - PlayerID</li>
+ * <li> - Presentation</li>
+ * <li> - RebootPlayer</li>
+ * <li> - RebootWithCrashReport</li>
+ * <li> - SetupType</li>
+ * <li> - SetupType</li>
+ * </ul>
+ *
+ * Location Group:
+ * <ul>
+ * <li> - Country</li>
+ * <li> - Latitude</li>
+ * <li> - Locality</li>
+ * <li> - Longitude</li>
+ * </ul>
+ *
+ * Logging Group:
+ * <ul>
+ * <li> - DiagnosticLog</li>
+ * <li> - EventLog</li>
+ * <li> - PlaybackLog</li>
+ * <li> - StateLog</li>
+ * <li> - UploadAtBoot</li>
+ * <li> - UploadTime</li>
+ * <li> - VariableLog</li>
+ * </ul>
+ *
+ * Network Interface Group:
+ * <ul>
+ * <li> - ContentDownload</li>
+ * <li> - DNS</li>
+ * <li> - Enabled</li>
+ * <li> - Gateway</li>
+ * <li> - HealthReporting</li>
+ * <li> - IPAddress</li>
+ * <li> - LogsUpload</li>
+ * <li> - MediaFeedsDownload</li>
+ * <li> - Name</li>
+ * <li> - Protocol</li>
+ * <li> - TextFeedsDownload</li>
+ * <li> - Type</li>
+ * </ul>
+ *
+ *
+ * Storage Group:
+ * <ul>
+ * <li> - Access</li>
+ * <li> - Interface</li>
+ * <li> - SizeFree(GB)</li>
+ * <li> - SizeTotal(GB)</li>
+ * <li> - System</li>
+ * </ul>
+ *
+ * </ul>
+ *
+ * @author Harry / Symphony Dev Team<br>
+ * Created on 05/06/2024
+ * @since 1.0.0
+ */
 public class BrightSignBSNCloudCommunicator extends RestCommunicator implements Aggregator, Monitorable, Controller {
 	/**
 	 * Process that is running constantly and triggers collecting data from BrightSign BSNCloud SE API endpoints, based on the given timeouts and thresholds.
@@ -458,7 +553,7 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 						JsonNode response = doPut(request, new HashMap<>(), JsonNode.class);
 
 						if (checkFailedResponse(response)) {
-							throw new IllegalArgumentException(String.format("Unable to control property: %s", property));
+							throw new RuntimeException(String.format("Unable to control property: %s", property));
 						}
 						break;
 					case BrightSignBSNCloudConstant.REBOOT_WITH_CRASH_REPORT:
@@ -470,7 +565,7 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 
 						response = doPut(request, rootNode, JsonNode.class);
 						if (checkFailedResponse(response)) {
-							throw new IllegalArgumentException(String.format("Unable to control property: %s", property));
+							throw new RuntimeException(String.format("Unable to control property: %s", property));
 						}
 						break;
 					default:
@@ -480,7 +575,7 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 						break;
 				}
 			} else {
-				throw new IllegalArgumentException(String.format("Unable to control property: %s as the device does not exist.", property));
+				throw new IllegalStateException(String.format("Unable to control property: %s as the device does not exist.", property));
 			}
 		} finally {
 			reentrantLock.unlock();

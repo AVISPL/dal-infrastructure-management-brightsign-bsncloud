@@ -5,7 +5,6 @@
 package com.avispl.symphony.dal.infrastructure.management.brightsign.bsncloud.common.metric;
 
 import java.util.Arrays;
-import java.util.Optional;
 
 /**
  * StatusEnum
@@ -59,7 +58,7 @@ public enum StatusEnum {
 	 * @return the name associated with the matching enum constant, or the input value if no match is found.
 	 */
 	public static String getNameByValue(String value) {
-		Optional<StatusEnum> property = Arrays.stream(values()).filter(item -> item.getValue().equalsIgnoreCase(value)).findFirst();
-		return property.isPresent() ? property.get().name : value;
+		return Arrays.stream(values()).filter(item -> item.getValue().equalsIgnoreCase(value)).
+				map(item -> item.name).findFirst().orElse(value);
 	}
 }

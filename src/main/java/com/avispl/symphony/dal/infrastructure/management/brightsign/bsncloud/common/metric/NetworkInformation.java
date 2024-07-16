@@ -5,7 +5,6 @@
 package com.avispl.symphony.dal.infrastructure.management.brightsign.bsncloud.common.metric;
 
 import java.util.Arrays;
-import java.util.Optional;
 
 import com.avispl.symphony.dal.infrastructure.management.brightsign.bsncloud.common.BrightSignBSNCloudConstant;
 
@@ -71,7 +70,7 @@ public enum NetworkInformation {
 	 * @return the name associated with the matching enum constant, or {@code BrightSignBSNCloudConstant.NONE} if no match is found.
 	 */
 	public static String getByDefaultName(String value) {
-		Optional<NetworkInformation> property = Arrays.stream(values()).filter(item -> item.getValue().equalsIgnoreCase(value)).findFirst();
-		return property.isPresent() ? property.get().name : BrightSignBSNCloudConstant.NONE;
+		return Arrays.stream(values()).filter(item -> item.getValue().equalsIgnoreCase(value))
+				.map(item -> item.name).findFirst().orElse(BrightSignBSNCloudConstant.NONE);
 	}
 }
