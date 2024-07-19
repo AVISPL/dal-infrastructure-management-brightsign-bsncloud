@@ -18,12 +18,11 @@ models:
         DeviceUptime: get("status")?.get("uptime")
         DeviceStatus: get("status")?.get("health")
         LastConnected: get("status")?.get("lastModifiedDate")
-        ExternalIPAddress: get("status")?.get("network")?.get("externalIp")
 
         GroupID: get("status")?.get("group")?.get("id")
         GroupName: get("status")?.get("group")?.get("name")
 
-        NetworkInterface: get("settings")?.get("network")?.get("interfaces")
+        NetworkInterface: get("status")?.get("network")
 
         Latitude: get("settings")?.get("location")?.get("gpsLatitude")
         Longitude: get("settings")?.get("location")?.get("gpsLongitude")
