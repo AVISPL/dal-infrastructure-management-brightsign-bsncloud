@@ -17,10 +17,8 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.TimeZone;
 import java.util.concurrent.ExecutorService;
@@ -100,7 +98,6 @@ import com.avispl.symphony.dal.util.StringUtils;
  * <li> - deviceOnline</li>
  * <li> - DeviceStatus</li>
  * <li> - DeviceUptime</li>
- * <li> - ExternalIPAddress</li>
  * <li> - GroupID</li>
  * <li> - GroupName</li>
  * <li> - LastConnected</li>
@@ -133,17 +130,11 @@ import com.avispl.symphony.dal.util.StringUtils;
  *
  * Network Interface Group:
  * <ul>
- * <li> - ContentDownload</li>
- * <li> - DNS</li>
- * <li> - Enabled</li>
- * <li> - Gateway</li>
- * <li> - HealthReporting</li>
  * <li> - IPAddress</li>
- * <li> - LogsUpload</li>
- * <li> - MediaFeedsDownload</li>
+ * <li> - Gateway</li>
+ * <li> - LocalIP</li>
  * <li> - Name</li>
  * <li> - Protocol</li>
- * <li> - TextFeedsDownload</li>
  * <li> - Type</li>
  * </ul>
  *
@@ -984,8 +975,8 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 	 * @param advancedControllableProperties A list of AdvancedControllableProperty objects to be populated with controllable properties.
 	 */
 	private void mapControllableProperty(Map<String, String> stats, List<AdvancedControllableProperty> advancedControllableProperties) {
-		addAdvancedControlProperties(advancedControllableProperties, stats, createButton(BrightSignBSNCloudConstant.REBOOT_PLAYER, "Apply", "Applying", 0), BrightSignBSNCloudConstant.NONE);
-		addAdvancedControlProperties(advancedControllableProperties, stats, createButton(BrightSignBSNCloudConstant.REBOOT_WITH_CRASH_REPORT, "Apply", "Applying", 0), BrightSignBSNCloudConstant.NONE);
+		addAdvancedControlProperties(advancedControllableProperties, stats, createButton(BrightSignBSNCloudConstant.REBOOT_PLAYER, "Reboot", "Rebooting", 0), BrightSignBSNCloudConstant.NONE);
+		addAdvancedControlProperties(advancedControllableProperties, stats, createButton(BrightSignBSNCloudConstant.REBOOT_WITH_CRASH_REPORT, "Reboot", "Rebooting", 0), BrightSignBSNCloudConstant.NONE);
 	}
 
 	/**
@@ -1055,7 +1046,7 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 			int index = 0;
 			for (JsonNode node : filteredNodes) {
 				index++;
-				String group = "Storage" + (filteredNodes.size() == 1 ? BrightSignBSNCloudConstant.EMPTY : index) + "#";
+				String group = "Storage" + (filteredNodes.size() == 1 ? BrightSignBSNCloudConstant.EMPTY : index) + BrightSignBSNCloudConstant.HASH;
 				for (StorageInformation item : StorageInformation.values()) {
 					switch (item) {
 						case SIZE_FREE:
@@ -1087,33 +1078,38 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 	private void populateNetworkInterface(String value, Map<String, String> stats) {
 		try {
 			JsonNode jsonNode = objectMapper.readTree(value);
-			int index = 0;
-			for (JsonNode item : jsonNode) {
-				index++;
-				String group = "NetworkInterface" + (jsonNode.size() == 1 ? BrightSignBSNCloudConstant.EMPTY : index) + "#";
-				Iterator<Entry<String, JsonNode>> fields = item.fields();
-				while (fields.hasNext()) {
-					Map.Entry<String, JsonNode> field = fields.next();
-					String key = field.getKey();
-					JsonNode valueItem = field.getValue();
+			if (!jsonNode.has(BrightSignBSNCloudConstant.EXTERNAL_IP) || !jsonNode.has(BrightSignBSNCloudConstant.INTERFACES)) {
+				return;
+			}
+			String ipAddress = jsonNode.get(BrightSignBSNCloudConstant.EXTERNAL_IP).asText();
+			JsonNode interfacesNode = jsonNode.get(BrightSignBSNCloudConstant.INTERFACES);
 
-					if (valueItem.isObject()) {
-						continue;
-					}
-					String valueNode;
-					if (valueItem.isArray()) {
-						valueNode = valueItem.toString().replace("[\"", BrightSignBSNCloudConstant.EMPTY).replace("\"]", BrightSignBSNCloudConstant.EMPTY);
-					} else if (valueItem.isNull()) {
-						valueNode = BrightSignBSNCloudConstant.NONE;
-					} else if (BrightSignBSNCloudConstant.TRUE.equalsIgnoreCase(valueItem.asText()) && !"enabled".equalsIgnoreCase(key)) {
-						valueNode = BrightSignBSNCloudConstant.ENABLED;
-					} else if (BrightSignBSNCloudConstant.FALSE.equalsIgnoreCase(valueItem.asText())) {
-						valueNode = BrightSignBSNCloudConstant.DISABLED;
-					} else {
-						valueNode = valueItem.asText();
-					}
-					if (!BrightSignBSNCloudConstant.NONE.equalsIgnoreCase(NetworkInformation.getByDefaultName(key))) {
-						stats.put(group + NetworkInformation.getByDefaultName(key), getDefaultValueForNullData(valueNode));
+			int index = 0;
+			for (JsonNode item : interfacesNode) {
+				index++;
+				String group = "NetworkInterface" + (interfacesNode.size() == 1 ? BrightSignBSNCloudConstant.EMPTY : index) + BrightSignBSNCloudConstant.HASH;
+				stats.put(group + "IPAddress", ipAddress);
+				for (NetworkInformation info : NetworkInformation.values()) {
+					String name = info.getName();
+					String valueNode = info.getValue();
+					if (item.has(valueNode)) {
+						JsonNode valueItem = item.get(valueNode);
+						switch (info) {
+							case IP:
+								if (valueItem.isArray()) {
+									if (valueItem.size() == 1) {
+										stats.put(group + name, valueItem.get(0).asText());
+									} else {
+										for (int i = 0; i < valueItem.size(); i++) {
+											stats.put(group + name + (i + 1), valueItem.get(i).asText());
+										}
+									}
+								}
+								break;
+							default:
+								stats.put(group + name, getDefaultValueForNullData(valueItem.asText()));
+								break;
+						}
 					}
 				}
 			}
@@ -1127,9 +1123,9 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 	 *
 	 * @param response The JSON response to be checked.
 	 * @return {@code true} if the response is null, does not contain the required data,
-	 *         or the success flag is not set to "true"; {@code false} otherwise.
+	 * or the success flag is not set to "true"; {@code false} otherwise.
 	 */
-	private boolean checkFailedResponse(JsonNode response){
+	private boolean checkFailedResponse(JsonNode response) {
 		if (response == null || !response.has(BrightSignBSNCloudConstant.DATA) || !response.get(BrightSignBSNCloudConstant.DATA).has(BrightSignBSNCloudConstant.RESULT) ||
 				!response.get(BrightSignBSNCloudConstant.DATA).get(BrightSignBSNCloudConstant.RESULT).has(BrightSignBSNCloudConstant.SUCCESS)
 				|| !BrightSignBSNCloudConstant.TRUE.equalsIgnoreCase(

@@ -16,17 +16,9 @@ import com.avispl.symphony.dal.infrastructure.management.brightsign.bsncloud.com
  * @since 1.0.0
  */
 public enum NetworkInformation {
-	IP("IPAddress", "ip"),
-	ENABLED("Enabled", "enabled"),
-	DNS("DNS", "dns"),
+	IP("LocalIP", "ip"),
 	GATEWAY("Gateway", "gateway"),
 	PROTOCOL("Protocol", "proto"),
-	CONTENT_DOWNLOAD("ContentDownload", "contentDownloadEnabled"),
-	TEXT_FEED("TextFeedsDownload", "textFeedsDownloadEnabled"),
-	MEDIA_FEED("MediaFeedsDownload", "mediaFeedsDownloadEnabled"),
-	HEALTH("HealthReporting", "healthReportingEnabled"),
-	LOGS("LogsUpload", "logsUploadEnabled"),
-	MAC("MAC", "mac"),
 	NAME("Name", "name"),
 	TYPE("Type", "type"),
 	;

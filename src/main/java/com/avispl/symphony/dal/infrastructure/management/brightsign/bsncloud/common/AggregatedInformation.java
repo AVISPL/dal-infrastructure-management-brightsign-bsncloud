@@ -21,7 +21,6 @@ public enum AggregatedInformation {
 	UPTIME("DeviceUptime", ""),
 	DEVICE_STATUS("DeviceStatus", ""),
 	LAST_CONNECTED("LastConnected", ""),
-	IP_ADDRESS("ExternalIPAddress", ""),
 	ID("GroupID", ""),
 	NAME("GroupName", ""),
 
