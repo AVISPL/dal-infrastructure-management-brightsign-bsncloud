@@ -1,0 +1,41 @@
+models:
+  - model:
+      name: Generic
+      vendor: BrightSignBSNCloud
+      filter: true
+      mapping:
+        deviceId: get("id")
+        deviceName: get("settings")?.get("name")
+        deviceModel: get("model")
+        deviceOnline: get("status")?.get("health").asText().equalsIgnoreCase("Normal")
+      properties:
+        PlayerID: get("serial")
+        Description: get("settings")?.get("description")
+        Presentation: get("status")?.get("presentation")?.get("name")
+        SetupType: get("settings")?.get("setupType")
+        Timezone: get("settings")?.get("timezone")
+        BrightSignOSVersion: get("status")?.get("firmware")?.get("version")
+        DeviceUptime: get("status")?.get("uptime")
+        DeviceStatus: get("status")?.get("health")
+        LastConnected: get("status")?.get("lastModifiedDate")
+
+        GroupID: get("status")?.get("group")?.get("id")
+        GroupName: get("status")?.get("group")?.get("name")
+
+        NetworkInterface: get("status")?.get("network")
+
+        Latitude: get("settings")?.get("location")?.get("gpsLatitude")
+        Longitude: get("settings")?.get("location")?.get("gpsLongitude")
+        Country: get("settings")?.get("location")?.get("countryLongName")
+        Locality: get("settings")?.get("location")?.get("localityLongName")
+
+
+        DiagnosticLog: get("settings")?.get("logging")?.get("enableDiagnosticLog")
+        EventLog: get("settings")?.get("logging")?.get("enableEventLog")
+        PlaybackLog: get("settings")?.get("logging")?.get("enablePlaybackLog")
+        StateLog: get("settings")?.get("logging")?.get("enableStateLog")
+        VariableLog: get("settings")?.get("logging")?.get("enableVariableLog")
+        UploadAtBoot: get("settings")?.get("logging")?.get("uploadAtBoot")
+        UploadTime: get("settings")?.get("logging")?.get("uploadTime")
+
+        Storage: get("status")?.get("storage")
