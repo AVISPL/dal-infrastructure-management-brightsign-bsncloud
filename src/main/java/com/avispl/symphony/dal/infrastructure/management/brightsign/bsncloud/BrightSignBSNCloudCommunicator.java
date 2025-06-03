@@ -666,7 +666,8 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 	}
 
 	/**
-	 *
+	 * Invalidate current login info and request new one
+	 * @throws Exception if any error occurs
 	 * */
 	private void refreshAuthentication() throws Exception {
 		this.loginInfo = new LoginInfo();
