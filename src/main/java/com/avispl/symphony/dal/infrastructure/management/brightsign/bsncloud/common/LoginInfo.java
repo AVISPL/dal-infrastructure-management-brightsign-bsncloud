@@ -61,12 +61,12 @@ public class LoginInfo {
 
 	/**
 	 * Check token expiry time
-	 * Token is timeout when elapsed > 10min
+	 * Token is timeout when elapsed > 9min, to leave 1m of time for data retrieval after the last checkup
 	 *
 	 * @return boolean
 	 */
 	public boolean isTimeout() {
 		long elapsed = (System.currentTimeMillis() - loginDateTime) / 60000;
-		return elapsed > 10;
+		return elapsed > 9;
 	}
 }
