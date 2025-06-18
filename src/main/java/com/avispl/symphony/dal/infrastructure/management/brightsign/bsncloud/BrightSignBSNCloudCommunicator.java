@@ -7,10 +7,6 @@ package com.avispl.symphony.dal.infrastructure.management.brightsign.bsncloud;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.net.ConnectException;
-import java.net.Socket;
-import java.net.SocketTimeoutException;
-import java.net.UnknownHostException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -443,59 +439,6 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 
 	/**
 	 * {@inheritDoc}
-	 * <p>
-	 *
-	 * Check for available devices before retrieving the value
-	 * ping latency information to Symphony
-	 */
-	@Override
-	public int ping() throws Exception {
-		if (this.pingMode == PingMode.ICMP) {
-			return super.ping();
-		} else if (this.pingMode == PingMode.TCP) {
-			if (isInitialized()) {
-				long pingResultTotal = 0L;
-
-				for (int i = 0; i < this.getPingAttempts(); i++) {
-					long startTime = System.currentTimeMillis();
-
-					try (Socket puSocketConnection = new Socket(this.host, this.getPort())) {
-						puSocketConnection.setSoTimeout(this.getPingTimeout());
-						if (puSocketConnection.isConnected()) {
-							long pingResult = System.currentTimeMillis() - startTime;
-							pingResultTotal += pingResult;
-							if (this.logger.isTraceEnabled()) {
-								this.logger.trace(String.format("PING OK: Attempt #%s to connect to %s on port %s succeeded in %s ms", i + 1, host, this.getPort(), pingResult));
-							}
-						} else {
-							if (this.logger.isDebugEnabled()) {
-								this.logger.debug(String.format("PING DISCONNECTED: Connection to %s did not succeed within the timeout period of %sms", host, this.getPingTimeout()));
-							}
-							return this.getPingTimeout();
-						}
-					} catch (SocketTimeoutException | ConnectException tex) {
-						throw new RuntimeException("Socket connection timed out", tex);
-					} catch (UnknownHostException ex) {
-						throw new UnknownHostException(String.format("Connection timed out, UNKNOWN host %s", host));
-					} catch (Exception e) {
-						if (this.logger.isWarnEnabled()) {
-							this.logger.warn(String.format("PING TIMEOUT: Connection to %s did not succeed, UNKNOWN ERROR %s: ", host, e.getMessage()));
-						}
-						return this.getPingTimeout();
-					}
-				}
-				return Math.max(1, Math.toIntExact(pingResultTotal / this.getPingAttempts()));
-			} else {
-				throw new IllegalStateException("Cannot use device class without calling init() first");
-			}
-		} else {
-			throw new IllegalArgumentException("Unknown PING Mode: " + pingMode);
-		}
-	}
-
-
-	/**
-	 * {@inheritDoc}
 	 */
 	@Override
 	public List<Statistics> getMultipleStatistics() throws Exception {
@@ -719,6 +662,14 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 	}
 
 	/**
+	 * Invalidate current login info and request new one
+	 * @throws Exception if any error occurs
+	 * */
+	private void refreshAuthentication() throws Exception {
+		this.loginInfo = new LoginInfo();
+		checkAuthentication();
+	}
+	/**
 	 * Retrieves an authorization token using the provided credentials.
 	 *
 	 * @param username the username for authentication
@@ -764,7 +715,7 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 	 * @param stats a map to store network information as key-value pairs
 	 * @throws ResourceNotReachableException if the network information cannot be retrieved
 	 */
-	private void populateNetworkInfo(Map<String, String> stats) {
+	private void populateNetworkInfo(Map<String, String> stats) throws Exception {
 		try {
 			JsonNode response = this.doGet(BrightSignBSNCloudCommand.NETWORK_INFO, JsonNode.class);
 			for (JsonNode item : response) {
@@ -803,6 +754,9 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 					break;
 				}
 			}
+		} catch (FailedLoginException fe) {
+			logger.error("Login error during network information retrieval.", fe);
+			refreshAuthentication();
 		} catch (Exception e) {
 			throw new ResourceNotReachableException("Unable to retrieve network information.", e);
 		}
@@ -832,11 +786,14 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 	 * @param stats a map to store network information as key-value pairs
 	 * @throws ResourceNotReachableException if the network information cannot be retrieved
 	 */
-	private void populateNumberOfDevice(Map<String, String> stats) {
+	private void populateNumberOfDevice(Map<String, String> stats) throws Exception {
 		try {
 			String response = this.doGet(BrightSignBSNCloudCommand.GET_NUMBER_OF_DEVICES + createParamFilter());
 			stats.put("NumberOfDevices", response);
 			numberOfDevices = Integer.parseInt(response);
+		} catch (FailedLoginException fe) {
+			logger.error("Failed login during devices number synchronization.", fe);
+			refreshAuthentication();
 		} catch (CommandFailureException ex) {
 			if (!ex.getResponse().contains("Unsupported value")) {
 				throw new ResourceNotReachableException("Unable to retrieve get number of devices on network.", ex);
@@ -934,7 +891,7 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 	private String createPageSizeParam() {
 		String result = "&pageSize=" + numberOfDevices;
 		if (StringUtils.isNotNullOrEmpty(nextMarker)) {
-			result += "&nextMarker=" + nextMarker;
+			result += "&marker=" + nextMarker;
 		}
 		return result;
 	}
