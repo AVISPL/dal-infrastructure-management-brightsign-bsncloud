@@ -33,9 +33,12 @@ public class BrightSignBSNCloudCommunicatorTest {
 	@BeforeEach
 	void setUp() throws Exception {
 		brightSignBSNCloudCommunicator = new BrightSignBSNCloudCommunicator();
-		brightSignBSNCloudCommunicator.setHost("");
+		brightSignBSNCloudCommunicator.setHost("api.bsn.cloud");
+//		brightSignBSNCloudCommunicator.setLogin("");
+//		brightSignBSNCloudCommunicator.setPassword("");
 		brightSignBSNCloudCommunicator.setLogin("");
 		brightSignBSNCloudCommunicator.setPassword("");
+		brightSignBSNCloudCommunicator.setNetworkName("AVISPL_Symphony_Dev");
 		brightSignBSNCloudCommunicator.setPort(443);
 		brightSignBSNCloudCommunicator.init();
 		brightSignBSNCloudCommunicator.connect();
@@ -51,6 +54,13 @@ public class BrightSignBSNCloudCommunicatorTest {
 	void testGetAggregatorData() throws Exception {
 		extendedStatistic = (ExtendedStatistics) brightSignBSNCloudCommunicator.getMultipleStatistics().get(0);
 		Map<String, String> statistics = extendedStatistic.getStatistics();
+		brightSignBSNCloudCommunicator.retrieveMultipleStatistics();
+		Thread.sleep(30000);
+		brightSignBSNCloudCommunicator.retrieveMultipleStatistics();
+		Thread.sleep(30000);
+		brightSignBSNCloudCommunicator.retrieveMultipleStatistics();
+		Thread.sleep(30000);
+		List<AggregatedDevice> devices = brightSignBSNCloudCommunicator.retrieveMultipleStatistics();
 		List<AdvancedControllableProperty> advancedControllableProperties = extendedStatistic.getControllableProperties();
 		Assert.assertEquals(11, statistics.size());
 	}
@@ -59,16 +69,17 @@ public class BrightSignBSNCloudCommunicatorTest {
 	void testGetAggregatorInformation() throws Exception {
 		extendedStatistic = (ExtendedStatistics) brightSignBSNCloudCommunicator.getMultipleStatistics().get(0);
 		Map<String, String> statistics = extendedStatistic.getStatistics();
+		Map<String, String> dynamicStatistics = extendedStatistic.getDynamicStatistics();
 		List<AdvancedControllableProperty> advancedControllableProperties = extendedStatistic.getControllableProperties();
 		Assert.assertEquals("AVISPL_Symphony_Dev", statistics.get("Name"));
-		Assert.assertEquals("1", statistics.get("NumberOfDevices"));
+		Assert.assertEquals("1", dynamicStatistics.get("NetworkDevicesTotal"));
 	}
 
 	@Test
 	void testGetAggregatorDataWhenFiltering() throws Exception {
-		brightSignBSNCloudCommunicator.setFilterByModel("");
-		brightSignBSNCloudCommunicator.setFilterByGroupName("");
-		brightSignBSNCloudCommunicator.setFilterByGroupID("373011");
+		brightSignBSNCloudCommunicator.setModelFilter("");
+		brightSignBSNCloudCommunicator.setGroupNameFilter("");
+		brightSignBSNCloudCommunicator.setGroupIDFilter("373011");
 		extendedStatistic = (ExtendedStatistics) brightSignBSNCloudCommunicator.getMultipleStatistics().get(0);
 		Map<String, String> statistics = extendedStatistic.getStatistics();
 		List<AdvancedControllableProperty> advancedControllableProperties = extendedStatistic.getControllableProperties();
@@ -79,9 +90,9 @@ public class BrightSignBSNCloudCommunicatorTest {
 
 	@Test
 	void testGetNumberOfDevicesWithFilter() throws Exception {
-		brightSignBSNCloudCommunicator.setFilterByModel("XD1035");
-		brightSignBSNCloudCommunicator.setFilterByGroupName("Default");
-		brightSignBSNCloudCommunicator.setFilterByGroupID("11");
+		brightSignBSNCloudCommunicator.setModelFilter("XT1145");
+//		brightSignBSNCloudCommunicator.setFilterByGroupName("Default");
+//		brightSignBSNCloudCommunicator.setFilterByGroupID("11");
 		brightSignBSNCloudCommunicator.getMultipleStatistics();
 		brightSignBSNCloudCommunicator.retrieveMultipleStatistics();
 		Thread.sleep(20000);
