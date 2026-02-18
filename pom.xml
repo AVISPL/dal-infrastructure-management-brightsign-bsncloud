@@ -3,10 +3,11 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.avispl.symphony.dal.infrastructure.management.brightsign.bsncloud</groupId>
   <artifactId>symphony-dal-infrastructure-management-brightsign-bsncloud</artifactId>
-  <version>1.0.1</version>
+  <version>1.0.2</version>
   <properties>
     <maven.compiler.source>1.8</maven.compiler.source>
     <maven.compiler.target>1.8</maven.compiler.target>
+    <timestamp>${maven.build.timestamp}</timestamp>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
   <build>
@@ -69,6 +70,12 @@
         </configuration>
       </plugin>
     </plugins>
+    <resources>
+      <resource>
+        <directory>src/main/resources</directory>
+        <filtering>true</filtering>
+      </resource>
+    </resources>
   </build>
   <dependencies>
     <!--system scope-->
@@ -162,9 +169,9 @@
       <scope>provided</scope>
     </dependency>
     <dependency>
-      <groupId>org.apache.httpcomponents</groupId>
-      <artifactId>httpclient</artifactId>
-      <version>4.5.13</version>
+      <groupId>org.apache.httpcomponents.client5</groupId>
+      <artifactId>httpclient5</artifactId>
+      <version>5.4.4</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
