@@ -36,4 +36,12 @@ public class BrightSignBSNCloudConstant {
 	public static final String DEFAULT_FORMAT_DATETIME_WITH_MILLIS  = "yyyy-MM-dd'T'HH:mm:ss.S'Z'";
 	public static final String DEFAULT_FORMAT_DATETIME_WITHOUT_MILLIS  = "yyyy-MM-dd'T'HH:mm:ss.S'Z'";
 	public static final String TARGET_FORMAT_DATETIME = "MMM d, yyyy, h:mm a";
+
+	public static final String ADAPTER_UPTIME = "AdapterUptime";
+	public static final String ADAPTER_UPTIME_MIN = "AdapterUptime(min)";
+	public static final String ADAPTER_BUILD_DATE = "AdapterBuildDate";
+	public static final String ADAPTER_VERSION = "AdapterVersion";
+	public static final String LAST_MONITORING_CYCLE_DURATION_S = "LastMonitoringCycleDuration(sec)";
+	public static final String MONITORED_DEVICES_TOTAL = "MonitoredDevicesTotal";
+	public static final String SYSTEM_MONITORING_CYCLE = "MonitoringCycleInterval(min)";
 }
