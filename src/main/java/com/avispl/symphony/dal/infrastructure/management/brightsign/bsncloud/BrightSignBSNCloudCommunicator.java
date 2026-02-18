@@ -336,17 +336,17 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 	/**
 	 * filter by group ID
 	 */
-	private String filterByGroupID;
+	private String groupIDFilter;
 
 	/**
 	 * filter by group name
 	 */
-	private String filterByGroupName;
+	private String groupNameFilter;
 
 	/**
 	 * filter by model
 	 */
-	private String filterByModel;
+	private String modelFilter;
 
 	/**
 	 * BSN Authentication hostname, has default value, can be overridden if needed.
@@ -390,57 +390,57 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 	}
 
 	/**
-	 * Retrieves {@link #filterByGroupID}
+	 * Retrieves {@link #groupIDFilter}
 	 *
-	 * @return value of {@link #filterByGroupID}
+	 * @return value of {@link #groupIDFilter}
 	 */
-	public String getFilterByGroupID() {
-		return filterByGroupID;
+	public String getGroupIDFilter() {
+		return groupIDFilter;
 	}
 
 	/**
-	 * Sets {@link #filterByGroupID} value
+	 * Sets {@link #groupIDFilter} value
 	 *
-	 * @param filterByStatus new value of {@link #filterByGroupID}
+	 * @param filterByStatus new value of {@link #groupIDFilter}
 	 */
-	public void setFilterByGroupID(String filterByStatus) {
-		this.filterByGroupID = filterByStatus;
+	public void setGroupIDFilter(String filterByStatus) {
+		this.groupIDFilter = filterByStatus;
 	}
 
 	/**
-	 * Retrieves {@link #filterByGroupName}
+	 * Retrieves {@link #groupNameFilter}
 	 *
-	 * @return value of {@link #filterByGroupName}
+	 * @return value of {@link #groupNameFilter}
 	 */
-	public String getFilterByGroupName() {
-		return filterByGroupName;
+	public String getGroupNameFilter() {
+		return groupNameFilter;
 	}
 
 	/**
-	 * Sets {@link #filterByGroupName} value
+	 * Sets {@link #groupNameFilter} value
 	 *
-	 * @param filterByGroupName new value of {@link #filterByGroupName}
+	 * @param groupNameFilter new value of {@link #groupNameFilter}
 	 */
-	public void setFilterByGroupName(String filterByGroupName) {
-		this.filterByGroupName = filterByGroupName;
+	public void setGroupNameFilter(String groupNameFilter) {
+		this.groupNameFilter = groupNameFilter;
 	}
 
 	/**
-	 * Retrieves {@link #filterByModel}
+	 * Retrieves {@link #modelFilter}
 	 *
-	 * @return value of {@link #filterByModel}
+	 * @return value of {@link #modelFilter}
 	 */
-	public String getFilterByModel() {
-		return filterByModel;
+	public String getModelFilter() {
+		return modelFilter;
 	}
 
 	/**
-	 * Sets {@link #filterByModel} value
+	 * Sets {@link #modelFilter} value
 	 *
-	 * @param filterByModel new value of {@link #filterByModel}
+	 * @param modelFilter new value of {@link #modelFilter}
 	 */
-	public void setFilterByModel(String filterByModel) {
-		this.filterByModel = filterByModel;
+	public void setModelFilter(String modelFilter) {
+		this.modelFilter = modelFilter;
 	}
 
 	/**
@@ -836,29 +836,29 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 		StringBuilder param = new StringBuilder("?filter=");
 		boolean isFirstFilterAdded = false;
 
-		if (StringUtils.isNotNullOrEmpty(filterByGroupID)) {
+		if (StringUtils.isNotNullOrEmpty(groupIDFilter)) {
 			param.append("[Status].[Group].[ID] IS IN (")
-					.append(filterByGroupID)
+					.append(groupIDFilter)
 					.append(")");
 			isFirstFilterAdded = true;
 		}
 
-		if (StringUtils.isNotNullOrEmpty(filterByModel)) {
+		if (StringUtils.isNotNullOrEmpty(modelFilter)) {
 			if (isFirstFilterAdded) {
 				param.append(" AND ");
 			}
 			param.append("[Model] IS IN (")
-					.append(convertToQuotedCSV(filterByModel))
+					.append(convertToQuotedCSV(modelFilter))
 					.append(")");
 			isFirstFilterAdded = true;
 		}
 
-		if (StringUtils.isNotNullOrEmpty(filterByGroupName)) {
+		if (StringUtils.isNotNullOrEmpty(groupNameFilter)) {
 			if (isFirstFilterAdded) {
 				param.append(" AND ");
 			}
 			param.append("[Status].[Group].[Name] IS IN (")
-					.append(convertToQuotedCSV(filterByGroupName))
+					.append(convertToQuotedCSV(groupNameFilter))
 					.append(")");
 		}
 		return param.toString();
