@@ -20,6 +20,8 @@ public class BrightSignBSNCloudConstant {
 	public static final String TRUE = "true";
 	public static final String FALSE = "false";
 	public static final String ACCESS_TOKEN = "access_token";
+	public static final String ACCESS_TOKEN_PATH = "/access_token";
+	public static final String EXPIRES_IN = "/expires_in";
 	public static final String NAME = "name";
 	public static final String ITEMS = "items";
 	public static final String STATS = "stats";

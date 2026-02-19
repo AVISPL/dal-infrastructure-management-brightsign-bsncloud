@@ -663,7 +663,7 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 		if (StringUtils.isNullOrEmpty(this.getLogin()) || StringUtils.isNullOrEmpty(this.getPassword())) {
 			throw new FailedLoginException("Username or Password field is empty. Please check device credentials");
 		}
-		if (this.loginInfo.isTimeout() || this.loginInfo.getToken() == null) {
+		if (this.loginInfo.updateRequired() || this.loginInfo.getToken() == null) {
 			retrieveToken();
 		}
 	}
@@ -689,8 +689,9 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 			request.add("grant_type", "client_credentials");
 			JsonNode response = this.doPost(authHostname + BrightSignBSNCloudCommand.TOKEN, request, JsonNode.class);
 			if (response != null && response.has(BrightSignBSNCloudConstant.ACCESS_TOKEN)) {
-				this.loginInfo.setToken(response.get(BrightSignBSNCloudConstant.ACCESS_TOKEN).asText());
+				this.loginInfo.setToken(response.at(BrightSignBSNCloudConstant.ACCESS_TOKEN_PATH).asText());
 				this.loginInfo.setLoginDateTime(System.currentTimeMillis());
+				this.loginInfo.setExpiresIn(response.at(BrightSignBSNCloudConstant.EXPIRES_IN).asInt());
 
 				Map<String, String> networkSetRequest = new HashMap<>();
 				networkSetRequest.put("name", networkName);
@@ -837,7 +838,7 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 		boolean isFirstFilterAdded = false;
 
 		if (StringUtils.isNotNullOrEmpty(groupIDFilter)) {
-			param.append("[Status].[Group].[ID] IS IN (")
+			param.append("[Settings].[Group].[ID] IS IN (")
 					.append(groupIDFilter)
 					.append(")");
 			isFirstFilterAdded = true;
@@ -857,7 +858,7 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 			if (isFirstFilterAdded) {
 				param.append(" AND ");
 			}
-			param.append("[Status].[Group].[Name] IS IN (")
+			param.append("[Settings].[Group].[Name] IS IN (")
 					.append(convertToQuotedCSV(groupNameFilter))
 					.append(")");
 		}
