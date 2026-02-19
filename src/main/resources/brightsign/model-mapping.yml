@@ -28,8 +28,6 @@ models:
         Longitude: get("settings")?.get("location")?.get("gpsLongitude")
         Country: get("settings")?.get("location")?.get("countryLongName")
         Locality: get("settings")?.get("location")?.get("localityLongName")
-
-
         DiagnosticLog: get("settings")?.get("logging")?.get("enableDiagnosticLog")
         EventLog: get("settings")?.get("logging")?.get("enableEventLog")
         PlaybackLog: get("settings")?.get("logging")?.get("enablePlaybackLog")
