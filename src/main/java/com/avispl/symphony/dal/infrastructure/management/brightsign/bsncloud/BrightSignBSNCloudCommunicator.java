@@ -660,8 +660,12 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 	 * @throws Exception if the authentication process fails.
 	 */
 	private void checkAuthentication() throws Exception {
-		if (StringUtils.isNullOrEmpty(this.getLogin()) || StringUtils.isNullOrEmpty(this.getPassword())) {
-			throw new FailedLoginException("Username or Password field is empty. Please check device credentials");
+		if (StringUtils.isNullOrEmpty(this.getLogin())) {
+			throw new FailedLoginException("Username field is empty. Please check device credentials.");
+		} else if (StringUtils.isNullOrEmpty(this.getPassword())) {
+			throw new FailedLoginException("Password field is empty. Please check device credentials.");
+		} else if (StringUtils.isNullOrEmpty(networkName)) {
+			throw new FailedLoginException("Missing networkName configuration property. Please check device configuration.");
 		}
 		if (this.loginInfo.updateRequired() || this.loginInfo.getToken() == null) {
 			retrieveToken();
