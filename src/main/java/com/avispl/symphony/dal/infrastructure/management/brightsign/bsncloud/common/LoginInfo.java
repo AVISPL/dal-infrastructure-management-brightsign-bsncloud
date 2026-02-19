@@ -14,12 +14,31 @@ package com.avispl.symphony.dal.infrastructure.management.brightsign.bsncloud.co
 public class LoginInfo {
 	private long loginDateTime = 0;
 	private String token;
+	private int expiresIn;
 
 	/**
 	 * Create an instance of LoginInfo
 	 */
 	public LoginInfo() {
 		this.loginDateTime = 0;
+	}
+
+	/**
+	 * Retrieves {@link #expiresIn}
+	 *
+	 * @return value of {@link #expiresIn}
+	 */
+	public int getExpiresIn() {
+		return expiresIn;
+	}
+
+	/**
+	 * Sets {@link #expiresIn} value
+	 *
+	 * @param expiresIn new value of {@link #expiresIn}
+	 */
+	public void setExpiresIn(int expiresIn) {
+		this.expiresIn = expiresIn;
 	}
 
 	/**
@@ -61,12 +80,12 @@ public class LoginInfo {
 
 	/**
 	 * Check token expiry time
-	 * Token is timeout when elapsed > 9min, to leave 1m of time for data retrieval after the last checkup
+	 * Token must be refreshed when half of the expiresIn time has elapsed.
 	 *
 	 * @return boolean
 	 */
-	public boolean isTimeout() {
-		long elapsed = (System.currentTimeMillis() - loginDateTime) / 60000;
-		return elapsed > 9;
+	public boolean updateRequired() {
+		long elapsed = (System.currentTimeMillis() - loginDateTime) / 1000;
+		return elapsed >= expiresIn/2;
 	}
 }
