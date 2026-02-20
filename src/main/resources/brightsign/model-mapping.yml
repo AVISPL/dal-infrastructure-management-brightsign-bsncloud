@@ -19,8 +19,8 @@ models:
         DeviceStatus: get("status")?.get("health")
         LastConnected: get("status")?.get("lastModifiedDate")
 
-        GroupID: get("status")?.get("group")?.get("id")
-        GroupName: get("status")?.get("group")?.get("name")
+        GroupID: get("settings")?.get("group")?.get("id")
+        GroupName: get("settings")?.get("group")?.get("name")
 
         NetworkInterface: get("status")?.get("network")
 
@@ -28,8 +28,6 @@ models:
         Longitude: get("settings")?.get("location")?.get("gpsLongitude")
         Country: get("settings")?.get("location")?.get("countryLongName")
         Locality: get("settings")?.get("location")?.get("localityLongName")
-
-
         DiagnosticLog: get("settings")?.get("logging")?.get("enableDiagnosticLog")
         EventLog: get("settings")?.get("logging")?.get("enableEventLog")
         PlaybackLog: get("settings")?.get("logging")?.get("enablePlaybackLog")

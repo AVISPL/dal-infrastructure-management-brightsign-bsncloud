@@ -8,15 +8,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.TimeZone;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -55,7 +47,6 @@ import com.avispl.symphony.dal.infrastructure.management.brightsign.bsncloud.com
 import com.avispl.symphony.dal.infrastructure.management.brightsign.bsncloud.common.BrightSignBSNCloudCommand;
 import com.avispl.symphony.dal.infrastructure.management.brightsign.bsncloud.common.BrightSignBSNCloudConstant;
 import com.avispl.symphony.dal.infrastructure.management.brightsign.bsncloud.common.LoginInfo;
-import com.avispl.symphony.dal.infrastructure.management.brightsign.bsncloud.common.PingMode;
 import com.avispl.symphony.dal.infrastructure.management.brightsign.bsncloud.common.metric.NetworkInformation;
 import com.avispl.symphony.dal.infrastructure.management.brightsign.bsncloud.common.metric.StatusEnum;
 import com.avispl.symphony.dal.infrastructure.management.brightsign.bsncloud.common.metric.StorageInformation;
@@ -324,10 +315,13 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 	 */
 	private List<AggregatedDevice> cachedData = Collections.synchronizedList(new ArrayList<>());
 
+	/** Adapter metadata properties - adapter version and build date */
+	private Properties adapterProperties;
+
 	/**
-	 * ping mode
+	 * Device adapter instantiation timestamp.
 	 */
-	private PingMode pingMode = PingMode.ICMP;
+	private long adapterInitializationTimestamp;
 
 	/**
 	 * number of devices
@@ -342,88 +336,111 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 	/**
 	 * filter by group ID
 	 */
-	private String filterByGroupID;
+	private String groupIDFilter;
 
 	/**
 	 * filter by group name
 	 */
-	private String filterByGroupName;
+	private String groupNameFilter;
 
 	/**
 	 * filter by model
 	 */
-	private String filterByModel;
+	private String modelFilter;
 
 	/**
-	 * Retrieves {@link #filterByGroupID}
+	 * BSN Authentication hostname, has default value, can be overridden if needed.
+	 * */
+	private String authHostname = "https://auth.bsn.cloud";
+
+	/**
+	 * Retrieves {@link #networkName}
 	 *
-	 * @return value of {@link #filterByGroupID}
+	 * @return value of {@link #networkName}
 	 */
-	public String getFilterByGroupID() {
-		return filterByGroupID;
+	public String getNetworkName() {
+		return networkName;
 	}
 
 	/**
-	 * Sets {@link #filterByGroupID} value
+	 * Sets {@link #networkName} value
 	 *
-	 * @param filterByStatus new value of {@link #filterByGroupID}
+	 * @param networkName new value of {@link #networkName}
 	 */
-	public void setFilterByGroupID(String filterByStatus) {
-		this.filterByGroupID = filterByStatus;
+	public void setNetworkName(String networkName) {
+		this.networkName = networkName;
 	}
 
 	/**
-	 * Retrieves {@link #filterByGroupName}
+	 * Retrieves {@link #authHostname}
 	 *
-	 * @return value of {@link #filterByGroupName}
+	 * @return value of {@link #authHostname}
 	 */
-	public String getFilterByGroupName() {
-		return filterByGroupName;
+	public String getAuthHostname() {
+		return authHostname;
 	}
 
 	/**
-	 * Sets {@link #filterByGroupName} value
+	 * Sets {@link #authHostname} value
 	 *
-	 * @param filterByGroupName new value of {@link #filterByGroupName}
+	 * @param authHostname new value of {@link #authHostname}
 	 */
-	public void setFilterByGroupName(String filterByGroupName) {
-		this.filterByGroupName = filterByGroupName;
+	public void setAuthHostname(String authHostname) {
+		this.authHostname = authHostname;
 	}
 
 	/**
-	 * Retrieves {@link #filterByModel}
+	 * Retrieves {@link #groupIDFilter}
 	 *
-	 * @return value of {@link #filterByModel}
+	 * @return value of {@link #groupIDFilter}
 	 */
-	public String getFilterByModel() {
-		return filterByModel;
+	public String getGroupIDFilter() {
+		return groupIDFilter;
 	}
 
 	/**
-	 * Sets {@link #filterByModel} value
+	 * Sets {@link #groupIDFilter} value
 	 *
-	 * @param filterByModel new value of {@link #filterByModel}
+	 * @param filterByStatus new value of {@link #groupIDFilter}
 	 */
-	public void setFilterByModel(String filterByModel) {
-		this.filterByModel = filterByModel;
+	public void setGroupIDFilter(String filterByStatus) {
+		this.groupIDFilter = filterByStatus;
 	}
 
 	/**
-	 * Retrieves {@link #pingMode}
+	 * Retrieves {@link #groupNameFilter}
 	 *
-	 * @return value of {@link #pingMode}
+	 * @return value of {@link #groupNameFilter}
 	 */
-	public String getPingMode() {
-		return pingMode.name();
+	public String getGroupNameFilter() {
+		return groupNameFilter;
 	}
 
 	/**
-	 * Sets {@link #pingMode} value
+	 * Sets {@link #groupNameFilter} value
 	 *
-	 * @param pingMode new value of {@link #pingMode}
+	 * @param groupNameFilter new value of {@link #groupNameFilter}
 	 */
-	public void setPingMode(String pingMode) {
-		this.pingMode = PingMode.ofString(pingMode);
+	public void setGroupNameFilter(String groupNameFilter) {
+		this.groupNameFilter = groupNameFilter;
+	}
+
+	/**
+	 * Retrieves {@link #modelFilter}
+	 *
+	 * @return value of {@link #modelFilter}
+	 */
+	public String getModelFilter() {
+		return modelFilter;
+	}
+
+	/**
+	 * Sets {@link #modelFilter} value
+	 *
+	 * @param modelFilter new value of {@link #modelFilter}
+	 */
+	public void setModelFilter(String modelFilter) {
+		this.modelFilter = modelFilter;
 	}
 
 	/**
@@ -434,6 +451,9 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 	public BrightSignBSNCloudCommunicator() throws IOException {
 		Map<String, PropertiesMapping> mapping = new PropertiesMappingParser().loadYML(BrightSignBSNCloudConstant.MODEL_MAPPING_AGGREGATED_DEVICE, getClass());
 		aggregatedDeviceProcessor = new AggregatedDeviceProcessor(mapping);
+
+		adapterProperties = new Properties();
+		adapterProperties.load(getClass().getResourceAsStream("/version.properties"));
 		this.setTrustAllCertificates(true);
 	}
 
@@ -449,10 +469,15 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 			}
 			checkAuthentication();
 			Map<String, String> statistics = new HashMap<>();
+			Map<String, String> dynamicStatistics = new HashMap<>();
 			ExtendedStatistics extendedStatistics = new ExtendedStatistics();
+
+			populateAdapterMetadata(statistics, dynamicStatistics);
 			populateNetworkInfo(statistics);
-			populateNumberOfDevice(statistics);
+			populateNumberOfDevices(dynamicStatistics);
+
 			extendedStatistics.setStatistics(statistics);
+			extendedStatistics.setDynamicStatistics(dynamicStatistics);
 			localExtendedStatistics = extendedStatistics;
 		} finally {
 			reentrantLock.unlock();
@@ -483,7 +508,7 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 				}
 				switch (propertyName) {
 					case BrightSignBSNCloudConstant.REBOOT_PLAYER:
-						String request = String.format(BrightSignBSNCloudCommand.REBOOT_ENDPOINT, deviceSerial);
+						String request = String.format(BrightSignBSNCloudCommand.REBOOT, deviceSerial);
 						JsonNode response = doPut(request, new HashMap<>(), JsonNode.class);
 
 						if (checkFailedResponse(response)) {
@@ -491,7 +516,7 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 						}
 						break;
 					case BrightSignBSNCloudConstant.REBOOT_WITH_CRASH_REPORT:
-						request = String.format(BrightSignBSNCloudCommand.REBOOT_ENDPOINT, deviceSerial);
+						request = String.format(BrightSignBSNCloudCommand.REBOOT, deviceSerial);
 						ObjectNode rootNode = objectMapper.createObjectNode();
 						ObjectNode dataNode = objectMapper.createObjectNode();
 						dataNode.put("crash_report", true);
@@ -528,7 +553,7 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 			try {
 				controlProperty(p);
 			} catch (Exception e) {
-				logger.error(String.format("Error when control property %s", p.getProperty()), e);
+				logger.error(String.format("Error while addressing the control property %s", p.getProperty()), e);
 			}
 		}
 	}
@@ -564,10 +589,14 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 	 */
 	@Override
 	protected HttpHeaders putExtraRequestHeaders(HttpMethod httpMethod, String uri, HttpHeaders headers) {
-		if (loginInfo.getToken() != null && !uri.contains(BrightSignBSNCloudCommand.REST_TOKEN)) {
+		if (loginInfo.getToken() != null && !uri.contains(BrightSignBSNCloudCommand.TOKEN)) {
 			headers.setBearerAuth(loginInfo.getToken());
+			headers.set("Content-Type", "application/json");
 		}
-		headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+		if (uri.contains(BrightSignBSNCloudCommand.TOKEN)) {
+			headers.set("Authorization", "Basic " + Base64.getEncoder().encodeToString(String.format("%s:%s", getLogin(), getPassword()).getBytes()));
+			headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+		}
 		if (uri.contains("v1/control/reboot")) {
 			headers.setContentType(MediaType.APPLICATION_JSON);
 		}
@@ -592,6 +621,7 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 		}
 		executorService = Executors.newFixedThreadPool(1);
 		executorService.submit(deviceDataLoader = new BrightSignBSNCloudDataLoader());
+		adapterInitializationTimestamp = System.currentTimeMillis();
 		super.internalInit();
 	}
 
@@ -630,34 +660,15 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 	 * @throws Exception if the authentication process fails.
 	 */
 	private void checkAuthentication() throws Exception {
-		if (StringUtils.isNullOrEmpty(this.getLogin()) || StringUtils.isNullOrEmpty(this.getPassword())) {
-			throw new FailedLoginException("Username or Password field is empty. Please check device credentials");
+		if (StringUtils.isNullOrEmpty(this.getLogin())) {
+			throw new FailedLoginException("Username field is empty. Please check device credentials.");
+		} else if (StringUtils.isNullOrEmpty(this.getPassword())) {
+			throw new FailedLoginException("Password field is empty. Please check device credentials.");
+		} else if (StringUtils.isNullOrEmpty(networkName)) {
+			throw new FailedLoginException("Missing networkName configuration property. Please check device configuration.");
 		}
-		if (this.loginInfo.isTimeout() || this.loginInfo.getToken() == null) {
-			String username;
-			String password;
-			String clientId;
-			String clientSecret;
-			String[] loginField = this.getLogin().split(BrightSignBSNCloudConstant.SPACE);
-			if (loginField.length == 2) {
-				username = loginField[0];
-				clientId = loginField[1];
-				String[] user = username.split("/");
-				if (user.length == 2) {
-					networkName = user[0];
-				}
-			} else {
-				throw new FailedLoginException("The format of Username field is incorrect. Please check again");
-			}
-
-			String[] passwordField = this.getPassword().split(BrightSignBSNCloudConstant.SPACE);
-			if (passwordField.length == 2) {
-				password = passwordField[0];
-				clientSecret = passwordField[1];
-			} else {
-				throw new FailedLoginException("The format of Password field is incorrect. Please check again");
-			}
-			retrieveToken(username, password, clientId, clientSecret);
+		if (this.loginInfo.updateRequired() || this.loginInfo.getToken() == null) {
+			retrieveToken();
 		}
 	}
 
@@ -672,29 +683,26 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 	/**
 	 * Retrieves an authorization token using the provided credentials.
 	 *
-	 * @param username the username for authentication
-	 * @param password the password for authentication
-	 * @param clientId the client ID for the application
-	 * @param clientSecret the client secret for the application
 	 * @throws FailedLoginException if login fails due to incorrect credentials
 	 * @throws ResourceNotReachableException if the endpoint is unreachable
 	 * @throws Exception for other unforeseen errors
 	 */
-	private void retrieveToken(String username, String password, String clientId, String clientSecret) throws Exception {
+	private void retrieveToken() throws Exception {
 		try {
 			MultiValueMap<String, String> request = new LinkedMultiValueMap<>();
-			request.add("client_id", clientId);
-			request.add("client_secret", clientSecret);
-			request.add("grant_type", "password");
-			request.add("username", username);
-			request.add("password", password);
-			JsonNode response = this.doPost(BrightSignBSNCloudCommand.REST_TOKEN, request, JsonNode.class);
+			request.add("grant_type", "client_credentials");
+			JsonNode response = this.doPost(authHostname + BrightSignBSNCloudCommand.TOKEN, request, JsonNode.class);
 			if (response != null && response.has(BrightSignBSNCloudConstant.ACCESS_TOKEN)) {
-				this.loginInfo.setToken(response.get(BrightSignBSNCloudConstant.ACCESS_TOKEN).asText());
+				this.loginInfo.setToken(response.at(BrightSignBSNCloudConstant.ACCESS_TOKEN_PATH).asText());
 				this.loginInfo.setLoginDateTime(System.currentTimeMillis());
+				this.loginInfo.setExpiresIn(response.at(BrightSignBSNCloudConstant.EXPIRES_IN).asInt());
+
+				Map<String, String> networkSetRequest = new HashMap<>();
+				networkSetRequest.put("name", networkName);
+				this.doPut(BrightSignBSNCloudCommand.NETWORK, networkSetRequest);
 			} else {
 				loginInfo = null;
-				throw new ResourceNotReachableException("Unable to retrieve the authorization token, endpoint not reachable");
+				throw new FailedLoginException("Unable to retrieve the authorization token: please check username(clientId)/password(clientSecret) or networkName provided.");
 			}
 		} catch (CommandFailureException e) {
 			if (e.getStatusCode() == 400) {
@@ -781,26 +789,45 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 	}
 
 	/**
+	 * Populate aggregator metadata - build date, version, uptime, system monitoring cycle, number of monitored devices in cache
+	 *
+	 * @param statistics to save regular statistics to
+	 * @param dynamicStatistics to save dynamic statistics to
+	 * */
+	private void populateAdapterMetadata(Map<String, String> statistics, Map<String, String> dynamicStatistics) {
+		statistics.put(BrightSignBSNCloudConstant.ADAPTER_VERSION, adapterProperties.getProperty("aggregator.version"));
+		statistics.put(BrightSignBSNCloudConstant.ADAPTER_BUILD_DATE, adapterProperties.getProperty("aggregator.build.date"));
+
+		long adapterUptime = System.currentTimeMillis() - adapterInitializationTimestamp;
+		statistics.put(BrightSignBSNCloudConstant.ADAPTER_UPTIME_MIN, String.valueOf(adapterUptime / (1000*60)));
+		statistics.put(BrightSignBSNCloudConstant.ADAPTER_UPTIME, normalizeUptime(adapterUptime/1000));
+		statistics.put(BrightSignBSNCloudConstant.SYSTEM_MONITORING_CYCLE, String.valueOf(getMonitoringRate()));
+//		if (lastMonitoringCycleDuration != null) {
+//			dynamicStatistics.put(BrightSignBSNCloudConstant.LAST_MONITORING_CYCLE_DURATION_S, String.valueOf(lastMonitoringCycleDuration));
+//		}
+		dynamicStatistics.put(BrightSignBSNCloudConstant.MONITORED_DEVICES_TOTAL, String.valueOf(cachedData.size()));
+	}
+	/**
 	 * Populates number of device on network into the provided stats map by retrieving data from the COUNT endpoint.
 	 *
-	 * @param stats a map to store network information as key-value pairs
+	 * @param dynamicStats a map to store network information as key-value pairs
 	 * @throws ResourceNotReachableException if the network information cannot be retrieved
 	 */
-	private void populateNumberOfDevice(Map<String, String> stats) throws Exception {
+	private void populateNumberOfDevices(Map<String, String> dynamicStats) throws Exception {
 		try {
-			String response = this.doGet(BrightSignBSNCloudCommand.GET_NUMBER_OF_DEVICES + createParamFilter());
-			stats.put("NumberOfDevices", response);
+			String response = this.doGet(BrightSignBSNCloudCommand.DEVICES_COUNT + createParamFilter());
+			dynamicStats.put("NetworkDevicesTotal", response);
 			numberOfDevices = Integer.parseInt(response);
 		} catch (FailedLoginException fe) {
 			logger.error("Failed login during devices number synchronization.", fe);
 			refreshAuthentication();
 		} catch (CommandFailureException ex) {
 			if (!ex.getResponse().contains("Unsupported value")) {
-				throw new ResourceNotReachableException("Unable to retrieve get number of devices on network.", ex);
+				throw new ResourceNotReachableException("Unable to retrieve number of network devices.", ex);
 			}
-			stats.put("NumberOfDevices", "0");
+			dynamicStats.put("NetworkDevicesTotal", "0");
 		} catch (Exception e) {
-			throw new ResourceNotReachableException("Unable to retrieve get number of devices on network.", e);
+			throw new ResourceNotReachableException("Unable to retrieve number of network devices.", e);
 		}
 	}
 
@@ -814,29 +841,29 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 		StringBuilder param = new StringBuilder("?filter=");
 		boolean isFirstFilterAdded = false;
 
-		if (StringUtils.isNotNullOrEmpty(filterByGroupID)) {
-			param.append("[Status].[Group].[ID] IS IN (")
-					.append(filterByGroupID)
+		if (StringUtils.isNotNullOrEmpty(groupIDFilter)) {
+			param.append("[Settings].[Group].[ID] IS IN (")
+					.append(groupIDFilter)
 					.append(")");
 			isFirstFilterAdded = true;
 		}
 
-		if (StringUtils.isNotNullOrEmpty(filterByModel)) {
+		if (StringUtils.isNotNullOrEmpty(modelFilter)) {
 			if (isFirstFilterAdded) {
 				param.append(" AND ");
 			}
 			param.append("[Model] IS IN (")
-					.append(convertToQuotedCSV(filterByModel))
+					.append(convertToQuotedCSV(modelFilter))
 					.append(")");
 			isFirstFilterAdded = true;
 		}
 
-		if (StringUtils.isNotNullOrEmpty(filterByGroupName)) {
+		if (StringUtils.isNotNullOrEmpty(groupNameFilter)) {
 			if (isFirstFilterAdded) {
 				param.append(" AND ");
 			}
-			param.append("[Status].[Group].[Name] IS IN (")
-					.append(convertToQuotedCSV(filterByGroupName))
+			param.append("[Settings].[Group].[Name] IS IN (")
+					.append(convertToQuotedCSV(groupNameFilter))
 					.append(")");
 		}
 		return param.toString();
@@ -862,7 +889,7 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 	 */
 	private void populateDeviceDetails() {
 		try {
-			JsonNode response = this.doGet(BrightSignBSNCloudCommand.GET_ALL_DEVICES + createParamFilter() + createPageSizeParam(), JsonNode.class);
+			JsonNode response = this.doGet(BrightSignBSNCloudCommand.LIST_DEVICES + createParamFilter() + createPageSizeParam(), JsonNode.class);
 			if (response != null && response.has(BrightSignBSNCloudConstant.ITEMS)) {
 				for (JsonNode jsonNode : response.get(BrightSignBSNCloudConstant.ITEMS)) {
 					JsonNode node = objectMapper.createArrayNode().add(jsonNode);
@@ -879,7 +906,7 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 			cachedData.clear();
 			logger.error(ex.getResponse(), ex);
 		} catch (Exception e) {
-			logger.error("Error while populate aggregated device", e);
+			logger.error("Error during device details retrieval.", e);
 		}
 	}
 
@@ -1125,7 +1152,7 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 			Date date = inputFormat.parse(inputDateTime);
 			return outputFormat.format(date);
 		} catch (Exception e) {
-			logger.warn("Can't convert the date time value");
+			logger.warn(String.format("Unable to parse the dateTime value %s to format %s.", inputDateTime, format));
 			return BrightSignBSNCloudConstant.NONE;
 		}
 	}
@@ -1158,11 +1185,11 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 		}
 		int minutes = Integer.parseInt(timeParts[1]);
 		if (days != 0) {
-			return days + " day(s) " + hours + " hour(s) " + minutes + " minute(s) ";
+			return days + " d " + hours + " hr " + minutes + " min ";
 		} else if (hours != 0) {
-			return hours + " hour(s) " + minutes + " minute(s) ";
+			return hours + " hr " + minutes + " min ";
 		} else {
-			return minutes + " minute(s) ";
+			return minutes + " min ";
 		}
 	}
 
@@ -1177,7 +1204,7 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 			long bytes = Long.parseLong(value);
 			return round((double) bytes / (1024 * 1024 * 1024), 2);
 		} catch (Exception e) {
-			logger.warn("Can't convert the value");
+			logger.warn("Unable to parse storage data: " + value);
 			return BrightSignBSNCloudConstant.NONE;
 		}
 	}
@@ -1244,5 +1271,38 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 
 			advancedControllableProperties.add(property);
 		}
+	}
+
+
+	/**
+	 * Uptime is received in seconds, need to normalize it and make it human-readable, like
+	 * 1 day 5 hour 12 minute 55 minute
+	 * Incoming parameter is may have a decimal point, so in order to safely process this - it's rounded first.
+	 * We don't need to add a segment of time if it's 0.
+	 *
+	 * @param uptimeSeconds value in seconds
+	 * @return string value of format 'x d x hr x min x sec'
+	 */
+	private String normalizeUptime(long uptimeSeconds) {
+		StringBuilder normalizedUptime = new StringBuilder();
+
+		long seconds = uptimeSeconds % 60;
+		long minutes = uptimeSeconds % 3600 / 60;
+		long hours = uptimeSeconds % 86400 / 3600;
+		long days = uptimeSeconds / 86400;
+
+		if (days > 0) {
+			normalizedUptime.append(days).append(" d ");
+		}
+		if (hours > 0) {
+			normalizedUptime.append(hours).append(" hr ");
+		}
+		if (minutes > 0) {
+			normalizedUptime.append(minutes).append(" min ");
+		}
+		if (seconds > 0) {
+			normalizedUptime.append(seconds).append(" sec");
+		}
+		return normalizedUptime.toString().trim();
 	}
 }
