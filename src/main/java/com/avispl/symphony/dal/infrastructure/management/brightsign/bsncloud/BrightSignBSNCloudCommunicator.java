@@ -810,7 +810,7 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 		try {
 			statistics.put(BrightSignBSNCloudConstant.SYSTEM_MONITORING_CYCLE, String.valueOf(getMonitoringRate()));
 		} catch (NoSuchMethodError nsme) {
-			logger.warn("Unsupported feathre: getMonitoringRate isn't available on current Cloud Connector version.", nsme);
+			logger.warn("Unsupported feature: getMonitoringRate isn't available on current Cloud Connector version.", nsme);
 		}
 //		if (lastMonitoringCycleDuration != null) {
 //			dynamicStatistics.put(BrightSignBSNCloudConstant.LAST_MONITORING_CYCLE_DURATION_S, String.valueOf(lastMonitoringCycleDuration));
