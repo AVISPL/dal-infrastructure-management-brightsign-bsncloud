@@ -969,8 +969,8 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 	 * @param advancedControllableProperties A list of AdvancedControllableProperty objects to be populated with controllable properties.
 	 */
 	private void mapControllableProperty(Map<String, String> stats, List<AdvancedControllableProperty> advancedControllableProperties) {
-		addAdvancedControlProperties(advancedControllableProperties, stats, createButton(BrightSignBSNCloudConstant.REBOOT_PLAYER, "Reboot", "Rebooting", 0), BrightSignBSNCloudConstant.NONE);
-		addAdvancedControlProperties(advancedControllableProperties, stats, createButton(BrightSignBSNCloudConstant.REBOOT_WITH_CRASH_REPORT, "Reboot", "Rebooting", 0), BrightSignBSNCloudConstant.NONE);
+		addAdvancedControlProperties(advancedControllableProperties, stats, createButton(BrightSignBSNCloudConstant.REBOOT_PLAYER, "Reboot", "Rebooting", 0), BrightSignBSNCloudConstant.NOT_AVAILABLE);
+		addAdvancedControlProperties(advancedControllableProperties, stats, createButton(BrightSignBSNCloudConstant.REBOOT_WITH_CRASH_REPORT, "Reboot", "Rebooting", 0), BrightSignBSNCloudConstant.NOT_AVAILABLE);
 	}
 
 	/**
