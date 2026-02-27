@@ -15,7 +15,7 @@ public class BrightSignBSNCloudConstant {
 	public static final String HASH = "#";
 	public static final String MODEL_MAPPING_AGGREGATED_DEVICE = "brightsign/model-mapping.yml";
 	public static final String NONE = "None";
-	public static final String SPACE = " ";
+	public static final String NOT_AVAILABLE = "N/A";
 	public static final String EMPTY = "";
 	public static final String TRUE = "true";
 	public static final String FALSE = "false";

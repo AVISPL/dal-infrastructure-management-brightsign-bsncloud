@@ -196,7 +196,13 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 					break loop;
 				}
 				if (flag) {
-					nextDevicesCollectionIterationTimestamp = System.currentTimeMillis() + 30000;
+					try {
+						nextDevicesCollectionIterationTimestamp = System.currentTimeMillis() + (getMonitoringRate() * 60000L);
+					} catch (NoSuchMethodError nsme) {
+						nextDevicesCollectionIterationTimestamp = System.currentTimeMillis() + 60000L;
+						logger.warn("Unsupported feature: getMonitoringRate isn't available on current Cloud Connector version.", nsme);
+					}
+
 					flag = false;
 				}
 
@@ -801,7 +807,11 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 		long adapterUptime = System.currentTimeMillis() - adapterInitializationTimestamp;
 		statistics.put(BrightSignBSNCloudConstant.ADAPTER_UPTIME_MIN, String.valueOf(adapterUptime / (1000*60)));
 		statistics.put(BrightSignBSNCloudConstant.ADAPTER_UPTIME, normalizeUptime(adapterUptime/1000));
-		statistics.put(BrightSignBSNCloudConstant.SYSTEM_MONITORING_CYCLE, String.valueOf(getMonitoringRate()));
+		try {
+			statistics.put(BrightSignBSNCloudConstant.SYSTEM_MONITORING_CYCLE, String.valueOf(getMonitoringRate()));
+		} catch (NoSuchMethodError nsme) {
+			logger.warn("Unsupported feature: getMonitoringRate isn't available on current Cloud Connector version.", nsme);
+		}
 //		if (lastMonitoringCycleDuration != null) {
 //			dynamicStatistics.put(BrightSignBSNCloudConstant.LAST_MONITORING_CYCLE_DURATION_S, String.valueOf(lastMonitoringCycleDuration));
 //		}
@@ -959,8 +969,8 @@ public class BrightSignBSNCloudCommunicator extends RestCommunicator implements 
 	 * @param advancedControllableProperties A list of AdvancedControllableProperty objects to be populated with controllable properties.
 	 */
 	private void mapControllableProperty(Map<String, String> stats, List<AdvancedControllableProperty> advancedControllableProperties) {
-		addAdvancedControlProperties(advancedControllableProperties, stats, createButton(BrightSignBSNCloudConstant.REBOOT_PLAYER, "Reboot", "Rebooting", 0), BrightSignBSNCloudConstant.NONE);
-		addAdvancedControlProperties(advancedControllableProperties, stats, createButton(BrightSignBSNCloudConstant.REBOOT_WITH_CRASH_REPORT, "Reboot", "Rebooting", 0), BrightSignBSNCloudConstant.NONE);
+		addAdvancedControlProperties(advancedControllableProperties, stats, createButton(BrightSignBSNCloudConstant.REBOOT_PLAYER, "Reboot", "Rebooting", 0), BrightSignBSNCloudConstant.NOT_AVAILABLE);
+		addAdvancedControlProperties(advancedControllableProperties, stats, createButton(BrightSignBSNCloudConstant.REBOOT_WITH_CRASH_REPORT, "Reboot", "Rebooting", 0), BrightSignBSNCloudConstant.NOT_AVAILABLE);
 	}
 
 	/**
